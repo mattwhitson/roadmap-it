@@ -1,4 +1,4 @@
-import { json, useFetcher, useParams } from "@remix-run/react";
+import { json, useFetcher } from "@remix-run/react";
 import { ActionFunctionArgs } from "@remix-run/node";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -34,7 +34,7 @@ const newCardSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
+  await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
   const formData = await request.json();

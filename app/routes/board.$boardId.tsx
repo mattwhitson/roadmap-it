@@ -1,5 +1,5 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { Outlet, useLoaderData } from "@remix-run/react";
 import { and, count, eq, sql } from "drizzle-orm";
 
 import { db } from "db";
@@ -21,7 +21,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
-  console.log("LOADER RUNNING");
+
   const boardId = params.boardId;
 
   if (typeof boardId !== "string") {
@@ -45,7 +45,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         cards: sql<
           CardWithDateAsString[]
         >`json_agg(json_build_object('id', ${cardsTable.id}, 'name', ${cardsTable.name},
-            'createdAt', ${cardsTable.description})) FILTER (WHERE ${cardsTable.id} IS NOT NULL)`,
+            'description', ${cardsTable.description})) FILTER (WHERE ${cardsTable.id} IS NOT NULL)`,
       })
       .from(listsTable)
       .leftJoin(cardsTable, eq(cardsTable.listId, listsTable.id))
@@ -79,6 +79,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   }
 
+  lists.sort((a, b) => a.list.position - b.list.position);
+
   return {
     board: board[0],
     lists,
@@ -99,32 +101,38 @@ export default function BoardPage() {
   const [listsState, setListsState] = useState(
     listsData?.map((list) => ({ ...list, id: list.list.id })) || []
   );
-  console.log(listsData);
+
   useEffect(() => {
     setListsState(
       listsData?.map((list) => ({ ...list, id: list.list.id })) || []
     );
   }, [listsData]);
+
   return (
-    <div className="w-full pt-[4.5rem]">
-      <div className="py-4 sm:py-5 px-4 backdrop-blur-sm flex items-center">
-        <h1 className="text-2xl font-semibold">{board.name}</h1>
-        <p className="mx-4 sm:ml-8 overflow-hidden text-ellipsis text-nowrap">
-          {board.description}
-        </p>
-        {isMemberOfBoard && (
-          <Button
-            variant="ghost"
-            className="p-1 ml-auto min-w-8 min-h-8 w-8 h-8"
-            onClick={() => onOpen(ModalTypes.AddList)}
-          >
-            <PlusIcon className="" />
-          </Button>
-        )}
+    <>
+      <div className="w-full pt-[4.5rem] h-[calc(100%-4.5rem)]">
+        <div className="py-4 sm:py-5 px-4 backdrop-blur-sm flex items-center">
+          <h1 className="text-2xl font-semibold text-nowrap">{board.name}</h1>
+          <p className="mx-4 sm:ml-8 overflow-hidden text-ellipsis text-nowrap">
+            {board.description}
+          </p>
+          {isMemberOfBoard && (
+            <Button
+              variant="ghost"
+              className="p-1 ml-auto min-w-8 min-h-8 w-8 h-8"
+              onClick={() =>
+                onOpen(ModalTypes.AddList, { listCount: listsState.length })
+              }
+            >
+              <PlusIcon className="" />
+            </Button>
+          )}
+        </div>
+        {listsState && listsState.length ? (
+          <DraggableList listWithCards={listsState} setLists={setListsState} />
+        ) : null}
       </div>
-      {listsState && listsState.length ? (
-        <DraggableList listWithCards={listsState} setLists={setListsState} />
-      ) : null}
-    </div>
+      <Outlet />
+    </>
   );
 }

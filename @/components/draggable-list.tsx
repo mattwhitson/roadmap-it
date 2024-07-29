@@ -63,15 +63,17 @@ export function DraggableList({
         items={listWithCards}
         strategy={horizontalListSortingStrategy}
       >
-        <main className="flex gap-x-2 px-4 w-fit">
-          {listWithCards &&
-            listWithCards.map((list: ListWithDateAsStringAndCards, index) => (
-              <ListComponent
-                key={list.list.id}
-                listWithCards={list}
-                index={index}
-              />
-            ))}
+        <main className="h-[calc(100%-1.5rem)]">
+          <div className="flex gap-x-2 px-4 overflow-x-auto h-full">
+            {listWithCards &&
+              listWithCards.map((list: ListWithDateAsStringAndCards, index) => (
+                <ListComponent
+                  key={list.list.id}
+                  listWithCards={list}
+                  index={index}
+                />
+              ))}
+          </div>
         </main>
       </SortableContext>
     </DndContext>

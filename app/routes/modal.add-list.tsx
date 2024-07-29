@@ -47,17 +47,19 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const name = jsonData.data.name;
   const boardId = formData.boardId;
+  const listCount = formData.listCount;
 
-  if (!boardId) {
+  if (!boardId || typeof listCount !== "number") {
     return json({ message: "Something went wrong", ok: false });
   }
 
   try {
-    // TODO: make sure user is member of board
+    // TODO: make sure user is member of board and add activity
     await db.insert(listsTable).values({
       boardId: boardId,
       createdBy: user.id,
       name: name,
+      position: listCount,
     });
   } catch (error) {
     console.error(error);
@@ -68,7 +70,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export function AddListModal() {
-  const { isOpen, onClose, type } = useModalStore();
+  const { isOpen, onClose, type, data } = useModalStore();
   const addList = useFetcher<typeof action>();
   const params = useParams();
   const revalidator = useRevalidate(`/board/${params.boardId}`);
@@ -81,9 +83,14 @@ export function AddListModal() {
   });
 
   async function onSubmit(values: z.infer<typeof newListSchema>) {
-    if (!params.boardId) return;
+    console.log(data);
+    if (
+      !params.boardId ||
+      (!data?.listCount && typeof data?.listCount !== "number")
+    )
+      return;
     addList.submit(
-      { values, boardId: params.boardId },
+      { values, boardId: params.boardId, listCount: data?.listCount },
       {
         method: "post",
         encType: "application/json",

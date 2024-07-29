@@ -1,5 +1,5 @@
 {
-  "id": "84d118d6-84ea-4ed3-b4f5-d72bf073eb22",
+  "id": "11eaca3f-b087-433d-a1b2-e359287d6efb",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -84,14 +84,21 @@
           "primaryKey": false,
           "notNull": true
         },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "board_id": {
-          "name": "board_id",
+        "card_id": {
+          "name": "card_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -112,12 +119,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "activities_table_board_id_boards_id_fk": {
-          "name": "activities_table_board_id_boards_id_fk",
+        "activities_table_card_id_card_id_fk": {
+          "name": "activities_table_card_id_card_id_fk",
           "tableFrom": "activities_table",
-          "tableTo": "boards",
+          "tableTo": "card",
           "columnsFrom": [
-            "board_id"
+            "card_id"
           ],
           "columnsTo": [
             "id"
@@ -270,8 +277,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "board_id": {
-          "name": "board_id",
+        "list_id": {
+          "name": "list_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -279,12 +286,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "card_board_id_list_id_fk": {
-          "name": "card_board_id_list_id_fk",
+        "card_list_id_list_id_fk": {
+          "name": "card_list_id_list_id_fk",
           "tableFrom": "card",
           "tableTo": "list",
           "columnsFrom": [
-            "board_id"
+            "list_id"
           ],
           "columnsTo": [
             "id"
@@ -328,6 +335,12 @@
         "board_id": {
           "name": "board_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         }

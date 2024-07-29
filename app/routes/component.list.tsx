@@ -67,8 +67,8 @@ export function ListComponent({
       </div>
       <section className="flex flex-col gap-y-2">
         {cards.map((card) => (
-          <Link key={card.id} to={`board/${params.boardId}/card/${card.id}`}>
-            <article className="p-1.5 dark:bg-zinc-800 rounded-sm text-sm">
+          <Link key={card.id} to={`/board/${params.boardId}/card/${card.id}`}>
+            <article className="p-2 dark:bg-zinc-800 rounded-md text-sm">
               <p className="line-clamp-2">{card.name}</p>
             </article>
           </Link>

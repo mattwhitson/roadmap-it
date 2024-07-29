@@ -1,6 +1,7 @@
 import { InferSelectModel, relations } from "drizzle-orm";
 import {
   boolean,
+  integer,
   pgTable,
   primaryKey,
   text,
@@ -94,6 +95,7 @@ export const listsTable = pgTable("list", {
   boardId: text("board_id")
     .notNull()
     .references(() => boardsTable.id),
+  position: integer("position").notNull(),
 });
 
 export const cardsTable = pgTable("card", {
@@ -102,7 +104,7 @@ export const cardsTable = pgTable("card", {
     .$defaultFn(() => crypto.randomUUID()),
   name: varchar("name", { length: 256 }).notNull(),
   description: text("description"),
-  listId: text("board_id")
+  listId: text("list_id")
     .notNull()
     .references(() => listsTable.id),
 });
@@ -113,22 +115,27 @@ export const activitiesTable = pgTable("activities_table", {
     .$defaultFn(() => crypto.randomUUID()),
   description: text("description").notNull(),
   userName: text("user_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
   userId: text("user_id")
     .notNull()
     .references(() => usersTable.id),
-  boardId: text("board_id")
+  cardId: text("card_id")
     .notNull()
-    .references(() => boardsTable.id),
+    .references(() => cardsTable.id),
 });
 
 export type User = InferSelectModel<typeof usersTable>;
 export type List = InferSelectModel<typeof listsTable>;
 export type Card = InferSelectModel<typeof cardsTable>;
+export type Acitivity = InferSelectModel<typeof activitiesTable>;
 
 export interface ListWithDateAsString extends Omit<List, "createdAt"> {
   createdAt: string;
 }
 export interface CardWithDateAsString extends Omit<Card, "createdAt"> {
+  createdAt: string;
+}
+export interface ActivityWithDateAsString extends Omit<Acitivity, "createdAt"> {
   createdAt: string;
 }
 

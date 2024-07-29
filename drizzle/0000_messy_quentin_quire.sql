@@ -10,8 +10,9 @@ CREATE TABLE IF NOT EXISTS "activities_table" (
 	"id" text PRIMARY KEY NOT NULL,
 	"description" text NOT NULL,
 	"user_name" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
 	"user_id" text NOT NULL,
-	"board_id" text NOT NULL
+	"card_id" text NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "boards" (
@@ -33,7 +34,7 @@ CREATE TABLE IF NOT EXISTS "card" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" varchar(256) NOT NULL,
 	"description" text,
-	"board_id" text NOT NULL
+	"list_id" text NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "list" (
@@ -41,7 +42,8 @@ CREATE TABLE IF NOT EXISTS "list" (
 	"name" varchar(256) NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"created_by" text NOT NULL,
-	"board_id" text NOT NULL
+	"board_id" text NOT NULL,
+	"position" integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "user" (
@@ -64,7 +66,7 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "activities_table" ADD CONSTRAINT "activities_table_board_id_boards_id_fk" FOREIGN KEY ("board_id") REFERENCES "public"."boards"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "activities_table" ADD CONSTRAINT "activities_table_card_id_card_id_fk" FOREIGN KEY ("card_id") REFERENCES "public"."card"("id") ON DELETE no action ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
@@ -88,7 +90,7 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- ALTER TABLE "card" ADD CONSTRAINT "card_board_id_list_id_fk" FOREIGN KEY ("board_id") REFERENCES "public"."list"("id") ON DELETE no action ON UPDATE no action;
+ ALTER TABLE "card" ADD CONSTRAINT "card_list_id_list_id_fk" FOREIGN KEY ("list_id") REFERENCES "public"."list"("id") ON DELETE no action ON UPDATE no action;
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
