@@ -84,6 +84,7 @@ export function AddCardModal() {
       { values, boardId: data.listId },
       { method: "post", action: "/modal/add-card", encType: "application/json" }
     );
+    form.reset();
   }
 
   useEffect(() => {

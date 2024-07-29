@@ -7,7 +7,7 @@ export enum ModalTypes {
 
 export interface DataType {
   listId?: string;
-  boardCount?: number;
+  listCount?: number;
 }
 
 interface ModalState {

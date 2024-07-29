@@ -14,7 +14,7 @@ import { PlusIcon } from "lucide-react";
 import { authenticator } from "~/services.auth.server";
 import { Button } from "@/components/ui/button";
 import { ModalTypes, useModalStore } from "@/hooks/use-modal-store";
-import { DraggableList } from "@/components/draggable-list";
+import { DraggableList } from "~/routes/component.draggable-list";
 import { useEffect, useState } from "react";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -107,11 +107,11 @@ export default function BoardPage() {
       listsData?.map((list) => ({ ...list, id: list.list.id })) || []
     );
   }, [listsData]);
-
+  console.log(listsState);
   return (
     <>
-      <div className="w-full pt-[4.5rem] h-[calc(100%-4.5rem)]">
-        <div className="py-4 sm:py-5 px-4 backdrop-blur-sm flex items-center">
+      <div className="w-full pt-[4.5rem] h-[calc(100%-4rem)]">
+        <div className="py-4 px-4 backdrop-blur-sm flex items-center overflow-hidden">
           <h1 className="text-2xl font-semibold text-nowrap">{board.name}</h1>
           <p className="mx-4 sm:ml-8 overflow-hidden text-ellipsis text-nowrap">
             {board.description}

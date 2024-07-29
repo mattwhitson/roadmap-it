@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ActionFunctionArgs } from "@remix-run/node";
 import { authenticator } from "~/services.auth.server";
-import { json, useFetcher } from "@remix-run/react";
+import { json, redirect, useFetcher, useNavigate } from "@remix-run/react";
 import { db } from "db";
 import { boardsTable, boardsToUsers } from "db/schema";
 import { useEffect } from "react";
@@ -36,13 +36,14 @@ export async function action({ request }: ActionFunctionArgs) {
   const result = formSchema.safeParse(formData);
 
   if (!result.success) {
-    return json({ message: "Something went wrong", ok: false });
+    return json({ message: "Something went wrong", ok: false, id: null });
   }
 
   const { data } = result;
 
+  let newBoard;
   try {
-    const newBoard = await db
+    newBoard = await db
       .insert(boardsTable)
       .values({
         createdBy: user.id,
@@ -58,12 +59,17 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   } catch (error) {
     console.error(error);
-    return json({ message: "Database error.", ok: false });
+    return json({ message: "Database error.", ok: false, id: null });
   }
-  return { message: "Board successfully created!", ok: true };
+  return {
+    message: "Board successfully created!",
+    ok: true,
+    id: newBoard[0].id,
+  };
 }
 
 export default function CreateBoardPage() {
+  const navigate = useNavigate();
   const createBoard = useFetcher<typeof action>();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -76,8 +82,12 @@ export default function CreateBoardPage() {
 
   useEffect(() => {
     if (!createBoard.data) return;
-    console.log(createBoard.data);
-  }, [createBoard.data]);
+    console.log(createBoard.data); // TODO ADD SUCCESS TOAST
+    if (createBoard.data.ok) {
+      console.log("WTF");
+      navigate(`/board/${createBoard.data.id}`);
+    }
+  }, [createBoard.data, navigate]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values);

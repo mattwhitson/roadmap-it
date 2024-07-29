@@ -8,9 +8,11 @@ import { Link, useParams } from "@remix-run/react";
 
 export function ListComponent({
   listWithCards,
+  id,
   index,
 }: {
   listWithCards: ListWithDateAsStringAndCards;
+  id: string;
   index: number;
 }) {
   const params = useParams();
@@ -21,12 +23,12 @@ export function ListComponent({
     transform,
     transition,
     activeIndex,
-  } = useSortable({ id: listWithCards.id });
-
+  } = useSortable({ id: id });
+  console.log(activeIndex, index, activeIndex === index);
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    zIndex: index === activeIndex ? 10 : 1,
+    display: index === activeIndex ? "hidden" : "block",
   };
 
   const cards = listWithCards.cards;
@@ -34,8 +36,11 @@ export function ListComponent({
   return (
     <section
       ref={setNodeRef}
-      style={style}
-      className="w-72 min-w-72 p-2 rounded-md dark:bg-neutral-900 mt-1 static self-start"
+      className="w-72 min-w-72 px-2 pb-1 pt-2 rounded-md dark:bg-neutral-900 mt-1 static self-start max-h-[calc(100vh-9.8rem)]"
+      style={{
+        ...style,
+        visibility: index === activeIndex ? "hidden" : "visible",
+      }}
     >
       <div
         className="flex items-center"
@@ -65,7 +70,8 @@ export function ListComponent({
           <GripHorizontal />
         </Button>
       </div>
-      <section className="flex flex-col gap-y-2">
+
+      <section className="flex flex-col gap-y-2 overflow-y-auto mb-1 max-h-[calc(100vh-13.3rem)] scrollbar-zinc-900 scrollbar-zinc-600 scrollbar-thin">
         {cards.map((card) => (
           <Link key={card.id} to={`/board/${params.boardId}/card/${card.id}`}>
             <article className="p-2 dark:bg-zinc-800 rounded-md text-sm">

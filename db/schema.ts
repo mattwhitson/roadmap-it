@@ -87,7 +87,7 @@ export const listsTable = pgTable("list", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: varchar("name", { length: 256 }).notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: text("created_by")
     .notNull()
@@ -102,7 +102,7 @@ export const cardsTable = pgTable("card", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: varchar("name", { length: 256 }).notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
   description: text("description"),
   listId: text("list_id")
     .notNull()
