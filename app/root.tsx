@@ -1,23 +1,71 @@
+import { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import {
   Links,
   Meta,
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from "@remix-run/react";
-import "./tailwind.css";
+import {
+  ThemeProvider,
+  useTheme,
+  PreventFlashOnWrongTheme,
+  Theme,
+} from "remix-themes";
+import { cn } from "@/lib/utils";
+
+import { themeSessionResolver } from "~/sessions.server";
+import { Header } from "~/routes/component.header";
+import { authenticator } from "~/services.auth.server";
+
+import styles from "~/globals.css?url";
+import { ModalProvider } from "@/components/providers/modal-provider";
+
+export const links: LinksFunction = () => [{ rel: "stylesheet", href: styles }];
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { getTheme } = await themeSessionResolver(request);
+  const user = await authenticator.isAuthenticated(request);
+  return {
+    theme: getTheme(),
+    user,
+  };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const data = useRouteLoaderData<typeof loader>("root");
+
   return (
-    <html lang="en">
+    <ThemeProvider
+      specifiedTheme={data?.theme as Theme}
+      themeAction="/action/set-theme"
+    >
+      <InnerLayout ssrTheme={Boolean(data?.theme)}>{children}</InnerLayout>
+    </ThemeProvider>
+  );
+}
+
+export function InnerLayout({
+  ssrTheme,
+  children,
+}: {
+  ssrTheme: boolean;
+  children: React.ReactNode;
+}) {
+  const [theme] = useTheme();
+  return (
+    <html lang="en" className={cn(theme)}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <PreventFlashOnWrongTheme ssrTheme={ssrTheme} />
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="font-Poppins">
         {children}
+        <ModalProvider />
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -26,5 +74,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    <>
+      <Header />
+      <Outlet />
+    </>
+  );
 }

@@ -1,48 +1,33 @@
-import type { MetaFunction } from "@remix-run/node";
+import { Button } from "@/components/ui/button";
+import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import { Link } from "@remix-run/react";
+import { authenticator } from "~/services.auth.server";
 
 export const meta: MetaFunction = () => {
-  return [
-    { title: "New Remix App" },
-    { name: "description", content: "Welcome to Remix!" },
-  ];
+  return [{ title: "Chart the Future" }, { name: "description", content: "" }];
 };
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  return await authenticator.isAuthenticated(request, {
+    successRedirect: "/home",
+  });
+}
 
 export default function Index() {
   return (
-    <div className="font-sans p-4">
-      <h1 className="text-3xl">Welcome to Remix</h1>
-      <ul className="list-disc mt-4 pl-6 space-y-2">
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/start/quickstart"
-            rel="noreferrer"
-          >
-            5m Quick Start
-          </a>
-        </li>
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/start/tutorial"
-            rel="noreferrer"
-          >
-            30m Tutorial
-          </a>
-        </li>
-        <li>
-          <a
-            className="text-blue-700 underline visited:text-purple-900"
-            target="_blank"
-            href="https://remix.run/docs"
-            rel="noreferrer"
-          >
-            Remix Docs
-          </a>
-        </li>
-      </ul>
-    </div>
+    <main className="p-4 h-full flex flex-col max-w-5xl mx-auto items-center justify-center gap-y-4 text-center">
+      <h1 className="text-7xl font-extrabold">RoadMap It.</h1>
+      <p className="font-semibold text-lg">
+        You&apos;re search for the perfect home for your roadmap is over
+      </p>
+      <Button className="mt-4 rounded-xl" asChild>
+        <Link to="/login">Get started</Link>
+      </Button>
+      <p className="text-lg mt-5 max-w-xl">
+        Task organization just became a whole lot easier. Easily create,
+        organize, and iterate on tasks that you won&apos;t lose track of a week
+        from now.
+      </p>
+    </main>
   );
 }
