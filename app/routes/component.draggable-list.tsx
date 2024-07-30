@@ -10,7 +10,8 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  UniqueIdentifier,
+  Active,
+  DragOverEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -18,14 +19,18 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 
-import { listsTable, ListWithDateAsStringAndCards } from "db/schema";
+import {
+  CardWithDateAsString,
+  listsTable,
+  ListWithDateAsStringAndCards,
+} from "db/schema";
 import { ListComponent } from "~/routes/component.list";
 import { authenticator } from "~/services.auth.server";
 import { json, useFetcher, useParams } from "@remix-run/react";
 import { db } from "db";
 import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { CardComponent } from "./component.card";
 
 export async function action({ request }: ActionFunctionArgs) {
   await authenticator.isAuthenticated(request, {
@@ -114,9 +119,10 @@ export function DraggableList({
   setLists: Dispatch<SetStateAction<ListWithDateAsStringAndCards[]>>;
 }) {
   const updatePositions = useFetcher<typeof action>();
-  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  const [activeElement, setActiveElement] =
-    useState<ListWithDateAsStringAndCards | null>(null);
+  const [activeDraggable, setActiveDraggable] = useState<Active | null>(null);
+  const [activeElement, setActiveElement] = useState<
+    ListWithDateAsStringAndCards | CardWithDateAsString | null
+  >(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const params = useParams();
   const id = useId();
@@ -126,6 +132,16 @@ export function DraggableList({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  function findCardInList(id: string) {
+    for (let i = 0; i < listWithCards.length; i++) {
+      const index = listWithCards[i].cards.findIndex((card) => card.id === id);
+      if (index !== -1) {
+        return i;
+      }
+    }
+    return null;
+  }
 
   function updateCardPositions(oldIndex: number, newIndex: number, id: string) {
     if (!params.boardId) return;
@@ -141,35 +157,85 @@ export function DraggableList({
 
   function handleDragStart(event: DragStartEvent) {
     const { active } = event;
-    for (let i = 0; i < listWithCards.length; i++) {
-      if (listWithCards[i].id === active.id) {
-        setActiveElement(listWithCards[i]);
-        setActiveIndex(i);
-        break;
+    if (active.data.current?.isList) {
+      for (let i = 0; i < listWithCards.length; i++) {
+        if (listWithCards[i].id === active.id) {
+          setActiveElement(listWithCards[i]);
+          setActiveIndex(i);
+          break;
+        }
+      }
+    } else {
+      for (let i = 0; i < listWithCards.length; i++) {
+        for (let j = 0; j < listWithCards[i].cards.length; j++)
+          if (listWithCards[i].cards[j].id === active.id) {
+            setActiveElement(listWithCards[i].cards[j]);
+          }
       }
     }
-    setActiveId(active.id);
+    setActiveDraggable(active);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    if (activeDraggable?.data.current?.isList) return;
+
+    const { active, over } = event;
+    const fromListIndex = findCardInList(active.id as string);
+    const toListIndex = findCardInList(over?.id as string);
+
+    if (
+      fromListIndex === null ||
+      toListIndex === null ||
+      fromListIndex === toListIndex
+    )
+      return;
+    console.log("from-to", fromListIndex, toListIndex);
+    setLists((prev) => {
+      const fromList = listWithCards[fromListIndex].cards;
+      const toList = listWithCards[toListIndex].cards;
+
+      console.log(JSON.parse(JSON.stringify(fromList)));
+      console.log(JSON.parse(JSON.stringify(toList)));
+      const activeIndex = fromList.findIndex((card) => card.id === active.id);
+      const overIndex = toList.findIndex((card) => card.id === over?.id);
+
+      if (activeIndex === -1 || overIndex === -1) return [...prev];
+      console.log(activeIndex, console.log(overIndex));
+      const result = [...prev];
+      result[fromListIndex].cards = [
+        ...fromList.filter((card) => card.id !== active.id),
+      ];
+      result[toListIndex].cards = [
+        ...toList.slice(0, overIndex),
+        fromList[activeIndex],
+        ...toList.slice(overIndex, toList.length),
+      ];
+
+      return result;
+    });
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      setLists((listWithCards) => {
-        const oldIndex = listWithCards.findIndex(
-          (listWithCard) => listWithCard.list.id === active.id
-        )!;
-        const newIndex = listWithCards.findIndex(
-          (listWithCard) => listWithCard.list.id === over.id
-        )!;
+    if (active.data.current?.isList) {
+      if (over && active.id !== over.id) {
+        setLists((listWithCards) => {
+          const oldIndex = listWithCards.findIndex(
+            (listWithCard) => listWithCard.list.id === active.id
+          )!;
+          const newIndex = listWithCards.findIndex(
+            (listWithCard) => listWithCard.list.id === over.id
+          )!;
 
-        updateCardPositions(oldIndex, newIndex, listWithCards[oldIndex].id);
+          updateCardPositions(oldIndex, newIndex, listWithCards[oldIndex].id);
 
-        return arrayMove(listWithCards, oldIndex, newIndex);
-      });
+          return arrayMove(listWithCards, oldIndex, newIndex);
+        });
+      }
     }
 
-    setActiveId(null);
+    setActiveDraggable(null);
     setActiveIndex(null);
     setActiveElement(null);
   }
@@ -179,18 +245,21 @@ export function DraggableList({
     console.log(updatePositions.data);
   }, [updatePositions.data]);
 
+  //console.log(listWithCards);
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       id={id}
-      modifiers={[restrictToHorizontalAxis]}
+      modifiers={activeDraggable?.data.current?.modifiers}
     >
       <SortableContext
         items={listWithCards}
         strategy={horizontalListSortingStrategy}
+        disabled={activeDraggable?.data.current?.isCard}
       >
         <main className="h-full">
           <div className="flex gap-x-2 px-4 h-full overflow-y-hidden scrollbar-zinc-900 scrollbar-zinc-600 scrollbar-thin">
@@ -201,18 +270,21 @@ export function DraggableList({
                   id={list.list.id}
                   listWithCards={list}
                   index={index}
+                  isListActive={activeDraggable?.data.current?.isList}
                 />
               ))}
           </div>
         </main>
       </SortableContext>
       <DragOverlay>
-        {activeId ? (
+        {activeDraggable?.data.current?.isList ? (
           <ListComponent
-            id={activeId as string}
-            listWithCards={activeElement!}
+            id={activeDraggable.id as string}
+            listWithCards={activeElement as ListWithDateAsStringAndCards}
             index={activeIndex!}
           />
+        ) : activeDraggable?.data.current?.isCard ? (
+          <CardComponent card={activeElement as CardWithDateAsString} />
         ) : null}
       </DragOverlay>
     </DndContext>

@@ -1,21 +1,27 @@
 import { Button } from "@/components/ui/button";
-import { useSortable } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ListWithDateAsStringAndCards } from "db/schema";
 import { GripHorizontal, Settings } from "lucide-react";
 import { ListDropdown } from "./component.list.dropdown";
-import { Link, useParams } from "@remix-run/react";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { CardComponent } from "./component.card";
 
 export function ListComponent({
   listWithCards,
   id,
   index,
+  isListActive = false,
 }: {
   listWithCards: ListWithDateAsStringAndCards;
   id: string;
   index: number;
+  isListActive?: boolean;
 }) {
-  const params = useParams();
   const {
     attributes,
     listeners,
@@ -23,16 +29,21 @@ export function ListComponent({
     transform,
     transition,
     activeIndex,
-  } = useSortable({ id: id });
-  console.log(activeIndex, index, activeIndex === index);
+  } = useSortable({
+    id: id,
+    data: {
+      modifiers: [restrictToHorizontalAxis],
+      isList: true,
+    },
+  });
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    display: index === activeIndex ? "hidden" : "block",
   };
 
   const cards = listWithCards.cards;
   const list = listWithCards.list;
+
   return (
     <section
       ref={setNodeRef}
@@ -72,13 +83,15 @@ export function ListComponent({
       </div>
 
       <section className="flex flex-col gap-y-2 overflow-y-auto mb-1 max-h-[calc(100vh-13.3rem)] scrollbar-zinc-900 scrollbar-zinc-600 scrollbar-thin">
-        {cards.map((card) => (
-          <Link key={card.id} to={`/board/${params.boardId}/card/${card.id}`}>
-            <article className="p-2 dark:bg-zinc-800 rounded-md text-sm">
-              <p className="line-clamp-2">{card.name}</p>
-            </article>
-          </Link>
-        ))}
+        <SortableContext
+          items={cards}
+          strategy={verticalListSortingStrategy}
+          disabled={isListActive}
+        >
+          {cards.map((card) => (
+            <CardComponent card={card} key={card.id} />
+          ))}
+        </SortableContext>
       </section>
     </section>
   );

@@ -107,7 +107,7 @@ export default function BoardPage() {
       listsData?.map((list) => ({ ...list, id: list.list.id })) || []
     );
   }, [listsData]);
-  console.log(listsState);
+  //console.log(listsState);
   return (
     <>
       <div className="w-full pt-[4.5rem] h-[calc(100%-4rem)]">
