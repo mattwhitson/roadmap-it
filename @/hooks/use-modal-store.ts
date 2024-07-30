@@ -8,6 +8,7 @@ export enum ModalTypes {
 export interface DataType {
   listId?: string;
   listCount?: number;
+  cardsListLength?: number;
 }
 
 interface ModalState {

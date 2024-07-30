@@ -1,6 +1,6 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { Outlet, useLoaderData } from "@remix-run/react";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 
 import { db } from "db";
 import {
@@ -45,11 +45,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         cards: sql<
           CardWithDateAsString[]
         >`json_agg(json_build_object('id', ${cardsTable.id}, 'name', ${cardsTable.name},
-            'description', ${cardsTable.description})) FILTER (WHERE ${cardsTable.id} IS NOT NULL)`,
+            'description', ${cardsTable.description}, 'position', ${cardsTable.position}) ORDER BY ${cardsTable.position} ASC) FILTER (WHERE ${cardsTable.id} IS NOT NULL)`,
       })
       .from(listsTable)
       .leftJoin(cardsTable, eq(cardsTable.listId, listsTable.id))
       .where(eq(listsTable.boardId, boardId))
+      .orderBy(asc(listsTable.position))
       .groupBy(listsTable.id);
 
     if (!board[0].board.public) {
@@ -78,8 +79,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       list.cards = [];
     }
   }
-
-  lists.sort((a, b) => a.list.position - b.list.position);
 
   return {
     board: board[0],

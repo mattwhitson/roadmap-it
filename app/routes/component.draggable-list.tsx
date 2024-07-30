@@ -2,7 +2,6 @@ import { Dispatch, SetStateAction, useEffect, useId, useState } from "react";
 import { ActionFunctionArgs } from "@remix-run/node";
 import {
   DndContext,
-  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -21,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 
 import {
+  cardsTable,
   CardWithDateAsString,
   listsTable,
   ListWithDateAsStringAndCards,
@@ -29,7 +29,7 @@ import { ListComponent } from "~/routes/component.list";
 import { authenticator } from "~/services.auth.server";
 import { json, useFetcher, useParams } from "@remix-run/react";
 import { db } from "db";
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, eq, gt, gte, lt, sql } from "drizzle-orm";
 import { CardComponent } from "./component.card";
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -38,77 +38,112 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   const jsonData = await request.json();
-  const { oldIndex, newIndex, boardId, listId } = jsonData;
+  const { type } = jsonData;
 
-  console.log(oldIndex, newIndex, boardId);
-  if (
-    typeof oldIndex !== "number" ||
-    typeof newIndex !== "number" ||
-    !boardId ||
-    !listId
-  ) {
-    return json({ message: "Something went wrong.", ok: false });
-  }
+  if (type === "List") {
+    const { oldIndex, newIndex, boardId, listId } = jsonData;
 
-  const decrement = oldIndex < newIndex;
-  let minIndex = oldIndex,
-    maxIndex = newIndex;
-  if (maxIndex < minIndex) {
-    const temp = minIndex;
-    minIndex = maxIndex;
-    maxIndex = temp;
-    // this accounts for inclusivity (i.e when list moves from pos 1 -> 0, we need to shift the element in pos 1 over by one to right)
-    minIndex--;
-  } else {
-    // this accounts for inclusivity (i.e when list moves from pos 0 -> 1, we need to shift the element in pos 1 over by one to left)
-    maxIndex++;
-  }
-
-  try {
-    // TODO: Check if user is member of board
-    // I was trying to to conditional operator inside sql tag for +- 1 but it doesn't seem to work :(
-    if (decrement) {
-      await db
-        .update(listsTable)
-        .set({
-          position: sql`${listsTable.position} - 1`,
-        })
-        .where(
-          and(
-            and(
-              lt(listsTable.position, maxIndex),
-              gt(listsTable.position, minIndex)
-            ),
-            eq(listsTable.boardId, boardId)
-          )
-        );
-    } else {
-      await db
-        .update(listsTable)
-        .set({
-          position: sql`${listsTable.position} + 1`,
-        })
-        .where(
-          and(
-            and(
-              lt(listsTable.position, maxIndex),
-              gt(listsTable.position, minIndex)
-            ),
-            eq(listsTable.boardId, boardId)
-          )
-        );
+    if (
+      typeof oldIndex !== "number" ||
+      typeof newIndex !== "number" ||
+      !boardId ||
+      !listId
+    ) {
+      return json({ message: "Something went wrong.", ok: false });
     }
 
-    await db
-      .update(listsTable)
-      .set({ position: newIndex })
-      .where(eq(listsTable.id, listId));
-  } catch (error) {
-    console.error(error);
-    json({ message: "Database error.", ok: false });
-  }
+    const decrement = oldIndex < newIndex;
+    let minIndex = oldIndex,
+      maxIndex = newIndex;
+    if (maxIndex < minIndex) {
+      const temp = minIndex;
+      minIndex = maxIndex;
+      maxIndex = temp;
+      // this accounts for inclusivity (i.e when list moves from pos 1 -> 0, we need to shift the element in pos 1 over by one to right)
+      minIndex--;
+    } else {
+      // this accounts for inclusivity (i.e when list moves from pos 0 -> 1, we need to shift the element in pos 1 over by one to left)
+      maxIndex++;
+    }
 
-  return json({ message: "Card positions successfully updated!", ok: true });
+    try {
+      // TODO: Check if user is member of board
+      // I was trying to to conditional operator inside sql tag for +- 1 but it doesn't seem to work :(
+      if (decrement) {
+        await db
+          .update(listsTable)
+          .set({
+            position: sql`${listsTable.position} - 1`,
+          })
+          .where(
+            and(
+              and(
+                lt(listsTable.position, maxIndex),
+                gt(listsTable.position, minIndex)
+              ),
+              eq(listsTable.boardId, boardId)
+            )
+          );
+      } else {
+        await db
+          .update(listsTable)
+          .set({
+            position: sql`${listsTable.position} + 1`,
+          })
+          .where(
+            and(
+              and(
+                lt(listsTable.position, maxIndex),
+                gt(listsTable.position, minIndex)
+              ),
+              eq(listsTable.boardId, boardId)
+            )
+          );
+      }
+
+      await db
+        .update(listsTable)
+        .set({ position: newIndex })
+        .where(eq(listsTable.id, listId));
+    } catch (error) {
+      console.error(error);
+      json({ message: "Database error.", ok: false });
+    }
+
+    return json({ message: "List positions successfully updated!", ok: true });
+  } else {
+    const { values, boardId } = jsonData;
+
+    if (!values === undefined || boardId === undefined) {
+      return json({ message: "Something went wrong.", ok: false });
+    }
+    console.log(values, boardId);
+    try {
+      await db
+        .update(cardsTable)
+        .set({
+          position: sql`${cardsTable.position} + 1`,
+        })
+        .where(
+          and(
+            gte(cardsTable.position, values.finalCardIndex),
+            eq(cardsTable.listId, values.listId)
+          )
+        );
+
+      await db
+        .update(cardsTable)
+        .set({
+          position: values.finalCardIndex,
+          listId: values.listId,
+        })
+        .where(eq(cardsTable.id, values.cardId));
+    } catch (error) {
+      console.error(error);
+      return json({ message: "Database error", ok: false });
+    }
+    return json({ message: "Card positions successfully updated!", ok: true });
+  }
 }
 
 export function DraggableList({
@@ -127,7 +162,13 @@ export function DraggableList({
   const params = useParams();
   const id = useId();
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 50,
+        distance: 20,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -143,10 +184,10 @@ export function DraggableList({
     return null;
   }
 
-  function updateCardPositions(oldIndex: number, newIndex: number, id: string) {
+  function updateListPositions(oldIndex: number, newIndex: number, id: string) {
     if (!params.boardId) return;
     updatePositions.submit(
-      { oldIndex, newIndex, boardId: params.boardId, listId: id },
+      { oldIndex, newIndex, boardId: params.boardId, listId: id, type: "List" },
       {
         method: "post",
         action: "/component/draggable-list",
@@ -170,6 +211,7 @@ export function DraggableList({
         for (let j = 0; j < listWithCards[i].cards.length; j++)
           if (listWithCards[i].cards[j].id === active.id) {
             setActiveElement(listWithCards[i].cards[j]);
+            break;
           }
       }
     }
@@ -184,35 +226,91 @@ export function DraggableList({
     const toListIndex = findCardInList(over?.id as string);
 
     if (
+      toListIndex === null &&
+      fromListIndex !== null &&
+      over?.id.toString().startsWith("emptygrid")
+    ) {
+      const id = Number(over?.id.toString().split("-")[1]);
+      setLists((prev) => {
+        const result = [...prev];
+        result[id].cards = [
+          ...result[fromListIndex].cards.filter(
+            (card) => card.id === active.id
+          ),
+        ];
+        result[fromListIndex].cards = [
+          ...result[fromListIndex].cards.filter(
+            (card) => card.id !== active.id
+          ),
+        ];
+
+        return result;
+      });
+    }
+
+    if (
       fromListIndex === null ||
       toListIndex === null ||
       fromListIndex === toListIndex
     )
       return;
-    console.log("from-to", fromListIndex, toListIndex);
     setLists((prev) => {
       const fromList = listWithCards[fromListIndex].cards;
       const toList = listWithCards[toListIndex].cards;
 
-      console.log(JSON.parse(JSON.stringify(fromList)));
-      console.log(JSON.parse(JSON.stringify(toList)));
       const activeIndex = fromList.findIndex((card) => card.id === active.id);
       const overIndex = toList.findIndex((card) => card.id === over?.id);
 
       if (activeIndex === -1 || overIndex === -1) return [...prev];
-      console.log(activeIndex, console.log(overIndex));
+
+      let isBottom = 0;
+      if (
+        over?.rect.top &&
+        active.rect.current.translated &&
+        over.rect.top + (over.rect.bottom - over.rect.top) / 2 <
+          active.rect.current.translated.top
+      )
+        isBottom++;
+
       const result = [...prev];
       result[fromListIndex].cards = [
         ...fromList.filter((card) => card.id !== active.id),
       ];
       result[toListIndex].cards = [
-        ...toList.slice(0, overIndex),
+        ...toList.slice(0, overIndex + isBottom),
         fromList[activeIndex],
-        ...toList.slice(overIndex, toList.length),
+        ...toList.slice(overIndex + isBottom, toList.length),
       ];
 
       return result;
     });
+  }
+
+  function updateCardPositions(
+    cardId: string,
+    listId: string,
+    finalListIndex: number,
+    finalCardIndex: number
+  ) {
+    if (!params.boardId) return;
+    updatePositions.submit(
+      {
+        values: {
+          cardId,
+          listId,
+          finalListIndex,
+          finalCardIndex,
+        },
+        boardId: params.boardId,
+        listId: id,
+        type: "Card",
+      },
+      {
+        method: "post",
+        action: "/component/draggable-list",
+        encType: "application/json",
+      }
+    );
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -228,11 +326,38 @@ export function DraggableList({
             (listWithCard) => listWithCard.list.id === over.id
           )!;
 
-          updateCardPositions(oldIndex, newIndex, listWithCards[oldIndex].id);
+          updateListPositions(oldIndex, newIndex, listWithCards[oldIndex].id);
 
           return arrayMove(listWithCards, oldIndex, newIndex);
         });
       }
+    } else {
+      setLists((prev) => {
+        const listIndex = findCardInList(active.id as string);
+
+        if (listIndex === null) return [...prev];
+
+        const list = listWithCards[listIndex].cards;
+
+        const activeIndex = list.findIndex((card) => card.id === active.id);
+        const overIndex = list.findIndex((card) => card.id === over?.id);
+
+        const result = [...prev];
+        result[listIndex].cards = arrayMove(
+          prev[listIndex].cards,
+          activeIndex,
+          overIndex
+        );
+
+        updateCardPositions(
+          activeDraggable?.id.toString() || "",
+          listWithCards[listIndex].id,
+          listIndex,
+          overIndex
+        );
+
+        return result;
+      });
     }
 
     setActiveDraggable(null);
@@ -249,7 +374,6 @@ export function DraggableList({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}

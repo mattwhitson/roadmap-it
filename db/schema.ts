@@ -1,6 +1,7 @@
 import { InferSelectModel, relations } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   pgTable,
   primaryKey,
@@ -98,16 +99,23 @@ export const listsTable = pgTable("list", {
   position: integer("position").notNull(),
 });
 
-export const cardsTable = pgTable("card", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: varchar("name", { length: 128 }).notNull(),
-  description: text("description"),
-  listId: text("list_id")
-    .notNull()
-    .references(() => listsTable.id),
-});
+export const cardsTable = pgTable(
+  "card",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: varchar("name", { length: 128 }).notNull(),
+    description: text("description"),
+    position: integer("position").notNull(),
+    listId: text("list_id")
+      .notNull()
+      .references(() => listsTable.id),
+  },
+  (t) => {
+    return { listAndPosIndex: index("list_and_pos").on(t.listId, t.position) };
+  }
+);
 
 export const activitiesTable = pgTable("activities_table", {
   id: text("id")

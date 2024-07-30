@@ -10,10 +10,12 @@ import { ModalTypes, useModalStore } from "@/hooks/use-modal-store";
 export function ListDropdown({
   icon,
   triggerClassName = "",
+  cardsListLength,
   listId,
 }: {
   icon: JSX.Element;
   triggerClassName?: string;
+  cardsListLength: number;
   listId: string;
 }) {
   const { onOpen } = useModalStore();
@@ -25,7 +27,9 @@ export function ListDropdown({
       <DropdownMenuContent>
         <DropdownMenuItem
           className="hover:cursor-pointer"
-          onClick={() => onOpen(ModalTypes.AddCard, { listId })}
+          onClick={() =>
+            onOpen(ModalTypes.AddCard, { listId, cardsListLength })
+          }
         >
           Add card
         </DropdownMenuItem>

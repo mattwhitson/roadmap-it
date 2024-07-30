@@ -1,5 +1,5 @@
 {
-  "id": "11eaca3f-b087-433d-a1b2-e359287d6efb",
+  "id": "2d01ca09-0121-4902-bf4b-e97a4341dac1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -267,7 +267,7 @@
         },
         "name": {
           "name": "name",
-          "type": "varchar(256)",
+          "type": "varchar(128)",
           "primaryKey": false,
           "notNull": true
         },
@@ -277,6 +277,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
         "list_id": {
           "name": "list_id",
           "type": "text",
@@ -284,7 +290,29 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "list_and_pos": {
+          "name": "list_and_pos",
+          "columns": [
+            {
+              "expression": "list_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "card_list_id_list_id_fk": {
           "name": "card_list_id_list_id_fk",
@@ -315,7 +343,7 @@
         },
         "name": {
           "name": "name",
-          "type": "varchar(256)",
+          "type": "varchar(128)",
           "primaryKey": false,
           "notNull": true
         },

@@ -43,20 +43,21 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!jsonData.success) {
     return json({ message: "Something went wrong...", ok: false });
   }
-
   const data = jsonData.data;
-  const boardId = formData.boardId;
+  const listId = formData.listId;
+  const cardsListLength = formData.cardsListLength;
 
-  if (!boardId) {
+  if (!listId || typeof cardsListLength !== "number") {
     return json({ message: "Something went wrong", ok: false });
   }
 
   try {
     // TODO Add activity and make sure user is member of board
     await db.insert(cardsTable).values({
-      listId: boardId,
+      listId: listId,
       name: data.name,
       description: data.description,
+      position: cardsListLength,
     });
   } catch (error) {
     console.error(error);
@@ -78,10 +79,10 @@ export function AddCardModal() {
   });
 
   async function onSubmit(values: z.infer<typeof newCardSchema>) {
-    console.log(values);
-    if (!data?.listId) return;
+    if (!data?.listId || data?.cardsListLength === undefined) return;
+
     createCard.submit(
-      { values, boardId: data.listId },
+      { values, listId: data.listId, cardsListLength: data.cardsListLength },
       { method: "post", action: "/modal/add-card", encType: "application/json" }
     );
     form.reset();
@@ -89,7 +90,7 @@ export function AddCardModal() {
 
   useEffect(() => {
     if (!createCard.data) return;
-    //TODO add toast
+    console.log(createCard.data);
     if (createCard.data.ok) {
       onClose();
     }
