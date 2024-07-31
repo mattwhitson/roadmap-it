@@ -2,7 +2,7 @@ import { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { db } from "db";
 import { boardsTable, boardsToUsers } from "db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { authenticator } from "~/services.auth.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -19,7 +19,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       })
       .from(boardsTable)
       .leftJoin(boardsToUsers, eq(boardsToUsers.userId, user.id))
-      .where(eq(boardsToUsers.userId, user.id));
+      .where(
+        and(
+          eq(boardsToUsers.userId, user.id),
+          eq(boardsToUsers.boardId, boardsTable.id)
+        )
+      );
   } catch (error) {
     console.log(error);
     return null;
@@ -33,6 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function HomePage() {
   const data = useLoaderData<typeof loader>();
   const boards = data?.boards;
+
   return (
     <main className="flex flex-col items-center justify-center h-full max-w-4xl mx-auto">
       <section className="grid grid-cols-3 gap-x-4">

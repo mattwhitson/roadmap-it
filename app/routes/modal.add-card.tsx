@@ -1,4 +1,4 @@
-import { json, useFetcher } from "@remix-run/react";
+import { json, useFetcher, useParams } from "@remix-run/react";
 import { ActionFunctionArgs } from "@remix-run/node";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,8 +25,9 @@ import { ModalTypes, useModalStore } from "@/hooks/use-modal-store";
 import { Input } from "@/components/ui/input";
 import { authenticator } from "~/services.auth.server";
 import { db } from "db";
-import { cardsTable } from "db/schema";
+import { activitiesTable, boardsToUsers, cardsTable } from "db/schema";
 import { useEffect } from "react";
+import { and, count, eq } from "drizzle-orm";
 
 const newCardSchema = z.object({
   name: z.string().min(1).max(256),
@@ -34,7 +35,7 @@ const newCardSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
-  await authenticator.isAuthenticated(request, {
+  const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
   const formData = await request.json();
@@ -46,18 +47,45 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = jsonData.data;
   const listId = formData.listId;
   const cardsListLength = formData.cardsListLength;
+  const boardId = formData.boardId;
+  const listName = formData.listName;
 
   if (!listId || typeof cardsListLength !== "number") {
     return json({ message: "Something went wrong", ok: false });
   }
 
   try {
-    // TODO Add activity and make sure user is member of board
-    await db.insert(cardsTable).values({
-      listId: listId,
-      name: data.name,
-      description: data.description,
-      position: cardsListLength,
+    //TODO: if we add admins, make sure they admin
+    const isUserMemberOfBoard = await db
+      .select({ count: count() })
+      .from(boardsToUsers)
+      .where(
+        and(
+          eq(boardsToUsers.boardId, boardId),
+          eq(boardsToUsers.userId, user.id)
+        )
+      );
+
+    if (isUserMemberOfBoard[0].count === 0) {
+      // TODO: tell them they don't have permission
+      return null;
+    }
+
+    const newCard = await db
+      .insert(cardsTable)
+      .values({
+        listId: listId,
+        name: data.name,
+        description: data.description,
+        position: cardsListLength,
+      })
+      .returning();
+
+    await db.insert(activitiesTable).values({
+      cardId: newCard[0].id,
+      description: `added this card to ${listName}`,
+      userId: user.id,
+      userName: user.name || "",
     });
   } catch (error) {
     console.error(error);
@@ -68,6 +96,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export function AddCardModal() {
+  const params = useParams();
   const { isOpen, onClose, type, data } = useModalStore();
   const createCard = useFetcher<typeof action>();
   const form = useForm<z.infer<typeof newCardSchema>>({
@@ -79,10 +108,22 @@ export function AddCardModal() {
   });
 
   async function onSubmit(values: z.infer<typeof newCardSchema>) {
-    if (!data?.listId || data?.cardsListLength === undefined) return;
+    if (
+      !data?.listId ||
+      !data.listName ||
+      !params.boardId ||
+      data?.cardsListLength === undefined
+    )
+      return;
 
     createCard.submit(
-      { values, listId: data.listId, cardsListLength: data.cardsListLength },
+      {
+        values,
+        boardId: params.boardId,
+        listId: data.listId,
+        cardsListLength: data.cardsListLength,
+        listName: data.listName,
+      },
       { method: "post", action: "/modal/add-card", encType: "application/json" }
     );
     form.reset();

@@ -1,5 +1,5 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
-import { Outlet, useLoaderData } from "@remix-run/react";
+import { Link, Outlet, useLoaderData } from "@remix-run/react";
 import { and, asc, count, eq, sql } from "drizzle-orm";
 
 import { db } from "db";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ModalTypes, useModalStore } from "@/hooks/use-modal-store";
 import { DraggableList } from "~/routes/component.draggable-list";
 import { useEffect, useState } from "react";
+import { useBoardContext } from "@/components/providers/board-provider";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -53,17 +54,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .orderBy(asc(listsTable.position))
       .groupBy(listsTable.id);
 
+    isUserMemberOfBoard = await db
+      .select({ count: count() })
+      .from(boardsToUsers)
+      .where(
+        and(
+          eq(boardsToUsers.boardId, boardId),
+          eq(boardsToUsers.userId, user.id)
+        )
+      );
     if (!board[0].board.public) {
-      isUserMemberOfBoard = await db
-        .select({ count: count() })
-        .from(boardsToUsers)
-        .where(
-          and(
-            eq(boardsToUsers.boardId, boardId),
-            eq(boardsToUsers.userId, user.id)
-          )
-        );
-
       if (isUserMemberOfBoard[0].count === 0) {
         // TODO: redirect this to custom page saying uh oh you're not a member
         return null;
@@ -100,6 +100,11 @@ export default function BoardPage() {
   const [listsState, setListsState] = useState(
     listsData?.map((list) => ({ ...list, id: list.list.id })) || []
   );
+  const { setBoardData } = useBoardContext();
+
+  useEffect(() => {
+    setBoardData({ isMemberOfBoard: isMemberOfBoard || false });
+  }, [isMemberOfBoard, setBoardData]);
 
   useEffect(() => {
     setListsState(
@@ -111,7 +116,9 @@ export default function BoardPage() {
     <>
       <div className="w-full pt-[4.5rem] h-[calc(100%-4rem)]">
         <div className="py-4 px-4 backdrop-blur-sm flex items-center overflow-hidden">
-          <h1 className="text-2xl font-semibold text-nowrap">{board.name}</h1>
+          <Link to={`/board/${board.id}/edit`}>
+            <h1 className="text-2xl font-semibold text-nowrap">{board.name}</h1>
+          </Link>
           <p className="mx-4 sm:ml-8 overflow-hidden text-ellipsis text-nowrap">
             {board.description}
           </p>
@@ -128,7 +135,11 @@ export default function BoardPage() {
           )}
         </div>
         {listsState && listsState.length ? (
-          <DraggableList listWithCards={listsState} setLists={setListsState} />
+          <DraggableList
+            listWithCards={listsState}
+            setLists={setListsState}
+            isMemberOfBoard={isMemberOfBoard || false}
+          />
         ) : null}
       </div>
       <Outlet />

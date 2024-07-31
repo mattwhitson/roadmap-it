@@ -29,8 +29,26 @@ import { ListComponent } from "~/routes/component.list";
 import { authenticator } from "~/services.auth.server";
 import { json, useFetcher, useParams } from "@remix-run/react";
 import { db } from "db";
-import { and, eq, gt, gte, lt, sql } from "drizzle-orm";
+import { and, eq, gt, gte, lt, ne, sql } from "drizzle-orm";
 import { CardComponent } from "./component.card";
+
+function getRangeOfIndicesToAlter(oldIndex: number, newIndex: number) {
+  const decrement = oldIndex < newIndex;
+  let minIndex = oldIndex,
+    maxIndex = newIndex;
+  if (maxIndex < minIndex) {
+    const temp = minIndex;
+    minIndex = maxIndex;
+    maxIndex = temp;
+    // this accounts for inclusivity (i.e when list moves from pos 1 -> 0, we need to shift the element in pos 1 over by one to right)
+    minIndex--;
+  } else {
+    // this accounts for inclusivity (i.e when list moves from pos 0 -> 1, we need to shift the element in pos 1 over by one to left)
+    maxIndex++;
+  }
+
+  return { decrement, minIndex, maxIndex };
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   await authenticator.isAuthenticated(request, {
@@ -39,7 +57,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const jsonData = await request.json();
   const { type } = jsonData;
-
   if (type === "List") {
     const { oldIndex, newIndex, boardId, listId } = jsonData;
 
@@ -52,54 +69,31 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({ message: "Something went wrong.", ok: false });
     }
 
-    const decrement = oldIndex < newIndex;
-    let minIndex = oldIndex,
-      maxIndex = newIndex;
-    if (maxIndex < minIndex) {
-      const temp = minIndex;
-      minIndex = maxIndex;
-      maxIndex = temp;
-      // this accounts for inclusivity (i.e when list moves from pos 1 -> 0, we need to shift the element in pos 1 over by one to right)
-      minIndex--;
-    } else {
-      // this accounts for inclusivity (i.e when list moves from pos 0 -> 1, we need to shift the element in pos 1 over by one to left)
-      maxIndex++;
-    }
-
+    const { decrement, minIndex, maxIndex } = getRangeOfIndicesToAlter(
+      oldIndex,
+      newIndex
+    );
     try {
       // TODO: Check if user is member of board
-      // I was trying to to conditional operator inside sql tag for +- 1 but it doesn't seem to work :(
+      let posQuery = sql`${listsTable.position} + 1`;
       if (decrement) {
-        await db
-          .update(listsTable)
-          .set({
-            position: sql`${listsTable.position} - 1`,
-          })
-          .where(
-            and(
-              and(
-                lt(listsTable.position, maxIndex),
-                gt(listsTable.position, minIndex)
-              ),
-              eq(listsTable.boardId, boardId)
-            )
-          );
-      } else {
-        await db
-          .update(listsTable)
-          .set({
-            position: sql`${listsTable.position} + 1`,
-          })
-          .where(
-            and(
-              and(
-                lt(listsTable.position, maxIndex),
-                gt(listsTable.position, minIndex)
-              ),
-              eq(listsTable.boardId, boardId)
-            )
-          );
+        posQuery = sql`${listsTable.position} - 1`;
       }
+
+      await db
+        .update(listsTable)
+        .set({
+          position: posQuery,
+        })
+        .where(
+          and(
+            and(
+              lt(listsTable.position, maxIndex),
+              gt(listsTable.position, minIndex)
+            ),
+            eq(listsTable.boardId, boardId)
+          )
+        );
 
       await db
         .update(listsTable)
@@ -112,24 +106,73 @@ export async function action({ request }: ActionFunctionArgs) {
 
     return json({ message: "List positions successfully updated!", ok: true });
   } else {
-    const { values, boardId } = jsonData;
+    const { values, boardId, movedInSameList, initialIndex, initialListId } =
+      jsonData;
 
-    if (!values === undefined || boardId === undefined) {
+    if (
+      !values === undefined ||
+      boardId === undefined ||
+      initialIndex === undefined ||
+      initialListId === undefined
+    ) {
       return json({ message: "Something went wrong.", ok: false });
     }
-    console.log(values, boardId);
+
     try {
-      await db
-        .update(cardsTable)
-        .set({
-          position: sql`${cardsTable.position} + 1`,
-        })
-        .where(
-          and(
-            gte(cardsTable.position, values.finalCardIndex),
-            eq(cardsTable.listId, values.listId)
-          )
+      if (movedInSameList) {
+        const { decrement, minIndex, maxIndex } = getRangeOfIndicesToAlter(
+          initialIndex,
+          values.finalCardIndex
         );
+
+        let posQuery = sql`${cardsTable.position} + 1`;
+        if (decrement) {
+          posQuery = sql`${cardsTable.position} - 1`;
+        }
+
+        await db
+          .update(cardsTable)
+          .set({
+            position: posQuery,
+          })
+          .where(
+            and(
+              and(
+                lt(cardsTable.position, maxIndex),
+                gt(cardsTable.position, minIndex)
+              ),
+              eq(cardsTable.listId, values.listId)
+            )
+          );
+      } else {
+        console.log(values.finalCardIndex);
+        await db
+          .update(cardsTable)
+          .set({
+            position: sql`${cardsTable.position} + 1`,
+          })
+          .where(
+            and(
+              and(
+                gte(cardsTable.position, values.finalCardIndex),
+                eq(cardsTable.listId, values.listId)
+              ),
+              ne(cardsTable.id, values.cardId)
+            )
+          );
+
+        await db
+          .update(cardsTable)
+          .set({
+            position: sql`${cardsTable.position} - 1`,
+          })
+          .where(
+            and(
+              gt(cardsTable.position, initialIndex),
+              eq(cardsTable.listId, initialListId)
+            )
+          );
+      }
 
       await db
         .update(cardsTable)
@@ -149,11 +192,16 @@ export async function action({ request }: ActionFunctionArgs) {
 export function DraggableList({
   listWithCards,
   setLists,
+  isMemberOfBoard,
 }: {
   listWithCards: ListWithDateAsStringAndCards[];
   setLists: Dispatch<SetStateAction<ListWithDateAsStringAndCards[]>>;
+  isMemberOfBoard: boolean;
 }) {
   const updatePositions = useFetcher<typeof action>();
+  const [initialCardPosition, setInitialCardPosition] = useState<
+    number[] | null
+  >(null);
   const [activeDraggable, setActiveDraggable] = useState<Active | null>(null);
   const [activeElement, setActiveElement] = useState<
     ListWithDateAsStringAndCards | CardWithDateAsString | null
@@ -187,7 +235,13 @@ export function DraggableList({
   function updateListPositions(oldIndex: number, newIndex: number, id: string) {
     if (!params.boardId) return;
     updatePositions.submit(
-      { oldIndex, newIndex, boardId: params.boardId, listId: id, type: "List" },
+      {
+        oldIndex,
+        newIndex,
+        boardId: params.boardId,
+        listId: id,
+        type: "List",
+      },
       {
         method: "post",
         action: "/component/draggable-list",
@@ -208,11 +262,13 @@ export function DraggableList({
       }
     } else {
       for (let i = 0; i < listWithCards.length; i++) {
-        for (let j = 0; j < listWithCards[i].cards.length; j++)
+        for (let j = 0; j < listWithCards[i].cards.length; j++) {
           if (listWithCards[i].cards[j].id === active.id) {
             setActiveElement(listWithCards[i].cards[j]);
+            setInitialCardPosition([i, j]);
             break;
           }
+        }
       }
     }
     setActiveDraggable(active);
@@ -224,26 +280,37 @@ export function DraggableList({
     const { active, over } = event;
     const fromListIndex = findCardInList(active.id as string);
     const toListIndex = findCardInList(over?.id as string);
-
+    // console.log("overId", over?.id);
+    //console.log(JSON.parse(JSON.stringify(listWithCards)));
     if (
       toListIndex === null &&
       fromListIndex !== null &&
       over?.id.toString().startsWith("emptygrid")
     ) {
       const id = Number(over?.id.toString().split("-")[1]);
+
+      // this means the card has already been put in this empty grid, in that case we don't want to do anything
+      if (listWithCards[id].cards.length > 0) return;
+      console.log(active.id, over.id);
       setLists((prev) => {
         const result = [...prev];
-        result[id].cards = [
-          ...result[fromListIndex].cards.filter(
-            (card) => card.id === active.id
-          ),
-        ];
+
+        const activeIndex = listWithCards[fromListIndex].cards.findIndex(
+          (card) => card.id === active.id
+        );
+
+        result[id] = {
+          ...result[id],
+          cards: [listWithCards[fromListIndex].cards[activeIndex]],
+        };
+
         result[fromListIndex].cards = [
           ...result[fromListIndex].cards.filter(
             (card) => card.id !== active.id
           ),
         ];
-
+        // console.log("FROM_LIST-TO", fromListIndex, id);
+        // console.log(JSON.parse(JSON.stringify(result)));
         return result;
       });
     }
@@ -254,7 +321,9 @@ export function DraggableList({
       fromListIndex === toListIndex
     )
       return;
+
     setLists((prev) => {
+      // console.log("hola senor");
       const fromList = listWithCards[fromListIndex].cards;
       const toList = listWithCards[toListIndex].cards;
 
@@ -290,7 +359,10 @@ export function DraggableList({
     cardId: string,
     listId: string,
     finalListIndex: number,
-    finalCardIndex: number
+    finalCardIndex: number,
+    movedInSameList: boolean,
+    initialListId: string,
+    initialIndex: number
   ) {
     if (!params.boardId) return;
     updatePositions.submit(
@@ -304,6 +376,9 @@ export function DraggableList({
         boardId: params.boardId,
         listId: id,
         type: "Card",
+        movedInSameList,
+        initialListId,
+        initialIndex,
       },
       {
         method: "post",
@@ -332,6 +407,7 @@ export function DraggableList({
         });
       }
     } else {
+      // console.log("NEVER SHOULD BE HERE");
       setLists((prev) => {
         const listIndex = findCardInList(active.id as string);
 
@@ -340,7 +416,10 @@ export function DraggableList({
         const list = listWithCards[listIndex].cards;
 
         const activeIndex = list.findIndex((card) => card.id === active.id);
-        const overIndex = list.findIndex((card) => card.id === over?.id);
+        let overIndex = list.findIndex((card) => card.id === over?.id);
+
+        // accounts for when overId is an empty empty list instead of a card
+        if (overIndex === -1) overIndex = 0;
 
         const result = [...prev];
         result[listIndex].cards = arrayMove(
@@ -349,15 +428,25 @@ export function DraggableList({
           overIndex
         );
 
-        updateCardPositions(
-          activeDraggable?.id.toString() || "",
-          listWithCards[listIndex].id,
-          listIndex,
-          overIndex
-        );
+        if (initialCardPosition !== null) {
+          const movedInSameList =
+            listIndex === initialCardPosition[0] &&
+            overIndex > initialCardPosition[1];
+          updateCardPositions(
+            activeDraggable?.id.toString() || "",
+            listWithCards[listIndex].id,
+            listIndex,
+            overIndex,
+            movedInSameList,
+            listWithCards[initialCardPosition[0]].id,
+            initialCardPosition[1]
+          );
+        }
 
         return result;
       });
+
+      setInitialCardPosition(null);
     }
 
     setActiveDraggable(null);
@@ -369,7 +458,7 @@ export function DraggableList({
     if (!updatePositions.data) return;
     console.log(updatePositions.data);
   }, [updatePositions.data]);
-
+  // console.log(JSON.parse(JSON.stringify(listWithCards)));
   //console.log(listWithCards);
   return (
     <DndContext
@@ -395,6 +484,7 @@ export function DraggableList({
                   listWithCards={list}
                   index={index}
                   isListActive={activeDraggable?.data.current?.isList}
+                  isMemberOfBoard={isMemberOfBoard}
                 />
               ))}
           </div>
@@ -403,6 +493,7 @@ export function DraggableList({
       <DragOverlay>
         {activeDraggable?.data.current?.isList ? (
           <ListComponent
+            isMemberOfBoard={isMemberOfBoard}
             id={activeDraggable.id as string}
             listWithCards={activeElement as ListWithDateAsStringAndCards}
             index={activeIndex!}

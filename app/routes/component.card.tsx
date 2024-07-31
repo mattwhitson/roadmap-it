@@ -14,6 +14,7 @@ export function CardComponent({
   parentIndex?: number;
   isParentListActive?: boolean;
 }) {
+  //console.log(card, index, parentIndex, isParentListActive);
   const { attributes, listeners, setNodeRef, transform, transition, active } =
     useSortable({
       id: card.id,

@@ -146,6 +146,10 @@ export interface CardWithDateAsString extends Omit<Card, "createdAt"> {
 export interface ActivityWithDateAsString extends Omit<Acitivity, "createdAt"> {
   createdAt: string;
 }
+export interface ActivityWIthDateAsStringAndUser
+  extends ActivityWithDateAsString {
+  user: User;
+}
 
 export interface ListWithDateAsStringAndCards {
   id: string;

@@ -21,8 +21,11 @@ import { authenticator } from "~/services.auth.server";
 
 import styles from "~/globals.css?url";
 import { ModalProvider } from "@/components/providers/modal-provider";
+import { BoardProvider } from "@/components/providers/board-provider";
 
-export const links: LinksFunction = () => [{ rel: "stylesheet", href: styles }];
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: styles, as: "style" },
+];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { getTheme } = await themeSessionResolver(request);
@@ -64,8 +67,10 @@ export function InnerLayout({
         <Links />
       </head>
       <body className="font-Poppins">
-        {children}
-        <ModalProvider />
+        <BoardProvider>
+          {children}
+          <ModalProvider />
+        </BoardProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

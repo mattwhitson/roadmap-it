@@ -17,11 +17,13 @@ export function ListComponent({
   id,
   index,
   isListActive = false,
+  isMemberOfBoard = false,
 }: {
   listWithCards: ListWithDateAsStringAndCards;
   id: string;
   index: number;
   isListActive?: boolean;
+  isMemberOfBoard?: boolean;
 }) {
   const {
     attributes,
@@ -42,6 +44,7 @@ export function ListComponent({
   const { setNodeRef: emptyNodeRef } = useDroppable({
     id: `emptygrid-${index}`,
   });
+
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
@@ -49,7 +52,6 @@ export function ListComponent({
 
   const cards = listWithCards.cards;
   const list = listWithCards.list;
-
   return (
     <section
       ref={setNodeRef}
@@ -64,29 +66,34 @@ export function ListComponent({
         style={{ marginBottom: `${cards && cards.length ? "0.5rem" : "0rem"}` }}
       >
         <h4 className="font-semibold text-sm p-1.5">{list.name}</h4>
-        <ListDropdown
-          listId={list.id}
-          cardsListLength={cards.length}
-          triggerClassName="ml-auto"
-          icon={
+        {isMemberOfBoard && (
+          <>
+            <ListDropdown
+              listId={list.id}
+              listName={list.name}
+              cardsListLength={cards.length}
+              triggerClassName="ml-auto"
+              icon={
+                <Button
+                  variant="ghost"
+                  className="h-8 w-8 p-1 outline-none hover:outline-none active:outline-none hover:cursor-pointer"
+                  asChild
+                >
+                  <Settings />
+                </Button>
+              }
+            />
             <Button
               variant="ghost"
-              className="h-8 w-8 p-1 outline-none hover:outline-none active:outline-none hover:cursor-pointer"
+              className="h-8 w-8 p-1 outline-none hover:outline-none active:outline-none focus-visible:ring-offset-0 rounded-sm"
               asChild
+              {...attributes}
+              {...listeners}
             >
-              <Settings />
+              <GripHorizontal />
             </Button>
-          }
-        />
-        <Button
-          variant="ghost"
-          className="h-8 w-8 p-1 outline-none hover:outline-none active:outline-none focus-visible:ring-offset-0 rounded-sm"
-          asChild
-          {...attributes}
-          {...listeners}
-        >
-          <GripHorizontal />
-        </Button>
+          </>
+        )}
       </div>
 
       <section
@@ -98,20 +105,19 @@ export function ListComponent({
           strategy={verticalListSortingStrategy}
           disabled={isListActive}
         >
-          {cards.map((card, cardIndex) => (
-            <CardComponent
-              card={card}
-              key={card.id}
-              isParentListActive={isDragging}
-              parentIndex={index}
-              index={cardIndex}
-            />
-          ))}
+          {cards.map((card, cardIndex) => {
+            return (
+              <CardComponent
+                card={card}
+                key={card.id}
+                isParentListActive={isDragging}
+                parentIndex={index}
+                index={cardIndex}
+              />
+            );
+          })}
           {cards.length === 0 && (
-            <div
-              className="h-1 bg-inherit mt-[-0.2rem]"
-              ref={emptyNodeRef}
-            ></div>
+            <div className="h-1 bg-inherit" ref={emptyNodeRef}></div>
           )}
         </SortableContext>
       </section>

@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ActionFunctionArgs } from "@remix-run/node";
 import { authenticator } from "~/services.auth.server";
-import { json, redirect, useFetcher, useNavigate } from "@remix-run/react";
+import { json, useFetcher, useNavigate } from "@remix-run/react";
 import { db } from "db";
 import { boardsTable, boardsToUsers } from "db/schema";
 import { useEffect } from "react";

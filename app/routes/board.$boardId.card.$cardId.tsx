@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
   json,
+  Link,
   useFetcher,
   useLoaderData,
   useNavigate,
@@ -11,13 +12,15 @@ import {
 import { db } from "db";
 import {
   activitiesTable,
-  ActivityWithDateAsString,
+  ActivityWIthDateAsStringAndUser,
   boardsTable,
   boardsToUsers,
   cardsTable,
   listsTable,
+  usersTable,
 } from "db/schema";
 import { and, count, eq, sql } from "drizzle-orm";
+import { format } from "date-fns";
 import { authenticator } from "~/services.auth.server";
 
 import {
@@ -29,8 +32,9 @@ import {
 } from "@/components/ui/dialog";
 import { ActivityIcon, FolderIcon, NotebookTextIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AutosizeTextarea } from "@/components/ui/autosize-text-area";
+import { useBoardContext } from "@/components/providers/board-provider";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -77,12 +81,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         name: cardsTable.name,
         description: cardsTable.description,
         activities: sql<
-          ActivityWithDateAsString[]
+          ActivityWIthDateAsStringAndUser[]
         >`json_agg(json_build_object('id', ${activitiesTable.id}, 'userName', ${activitiesTable.userName},
-            'description', ${activitiesTable.description})) FILTER (WHERE ${activitiesTable.id} IS NOT NULL)`,
+            'description', ${activitiesTable.description}, 'createdAt', ${activitiesTable.createdAt}, 'user', ${usersTable}) ORDER BY ${activitiesTable.createdAt} DESC) FILTER (WHERE ${activitiesTable.id} IS NOT NULL)`,
       })
       .from(cardsTable)
       .leftJoin(activitiesTable, eq(activitiesTable.cardId, cardId))
+      .leftJoin(usersTable, eq(usersTable.id, activitiesTable.userId))
       .where(eq(cardsTable.id, cardId))
       .groupBy(cardsTable.id);
 
@@ -153,15 +158,18 @@ export default function CardPage() {
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState(data?.card.description || "");
 
+  const { boardData } = useBoardContext();
+
   const navigate = useNavigate();
   const params = useParams();
   const card = data?.card;
   const list = data?.list;
-
+  // console.log(card?.activities);
   useEffect(() => {
     if (!editDescription.data) return;
     console.log(editDescription.data);
     //TODO: Add toast bruh
+    // TODO: if update failed for whatever reason, roll back description
   }, [editDescription.data]);
 
   useEffect(() => {
@@ -200,7 +208,6 @@ export default function CardPage() {
         encType: "application/json",
       }
     );
-
     setIsEditing(false);
   }
 
@@ -232,7 +239,9 @@ export default function CardPage() {
                   </div>
                   {!isEditing ? (
                     <p className="ml-10 text-sm text-muted-foreground">
-                      {card?.description}
+                      {editDescription.state !== "idle"
+                        ? description
+                        : card?.description}
                     </p>
                   ) : (
                     <AutosizeTextarea
@@ -245,18 +254,19 @@ export default function CardPage() {
                     <p className="text-destructive text-sm ml-2">{error}</p>
                   )}
                 </div>
-
-                <Button
-                  onClick={() => {
-                    setError(null);
-                    setIsEditing((prev) => !prev);
-                    setDescription(data?.card.description || "");
-                  }}
-                  className="ml-4"
-                  variant="secondary"
-                >
-                  {isEditing ? "Cancel" : "Edit"}
-                </Button>
+                {boardData.isMemberOfBoard && (
+                  <Button
+                    onClick={() => {
+                      setError(null);
+                      setIsEditing((prev) => !prev);
+                      setDescription(data?.card.description || "");
+                    }}
+                    className="ml-4"
+                    variant="secondary"
+                  >
+                    {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                )}
               </div>
             </article>
             <article>
@@ -264,32 +274,56 @@ export default function CardPage() {
                 <ActivityIcon className="min-w-6 min-h-6" />
                 <h4 className="text-lg font-semibold">Activity</h4>
               </div>
-              <div className="flex flex-col space-y-1 mt-2">
+              <div className="flex flex-col mt-4 space-y-2">
                 {card?.activities &&
                   card?.activities.map((activity) => (
-                    <Fragment key={activity.id}>
-                      <p className="ml-10 text-sm text-muted-foreground text-nowrap overflow-ellipsis">
-                        <em className="not-italic font-semibold">
-                          {activity.userName}
-                        </em>{" "}
-                        {activity.description}
+                    <article key={activity.id}>
+                      <div className="ml-1 flex relative items-center">
+                        <Link
+                          to={`/user/${activity.user.id}`}
+                          className="relative rounded-full overflow-hidden w-7 h-7 bg-background hover:bg-background mr-2"
+                        >
+                          <img
+                            className="absolute object-cover w-7 h-7"
+                            src={activity.user.image || undefined}
+                            alt="Log out"
+                            referrerPolicy="no-referrer"
+                          />
+                        </Link>
+                        <p className="text-sm text-muted-foreground text-nowrap overflow-ellipsis">
+                          <em className="not-italic font-semibold">
+                            {activity.user.name}
+                          </em>{" "}
+                          {activity.description}
+                        </p>
+                      </div>
+                      <p className="ml-10 text-xs font-light text-muted-foreground ">
+                        {format(
+                          new Date(activity.createdAt).getTime() -
+                            new Date().getTimezoneOffset() * 60 * 1000,
+
+                          "PPpp"
+                        )}
                       </p>
-                      <p>{activity.createdAt}</p>
-                    </Fragment>
+                    </article>
                   ))}
               </div>
             </article>
           </section>
           <section className="mt-10 flex flex-col justify-end items-end space-y-2">
-            <Button className="w-full" variant="destructive">
-              Delete Card
-            </Button>
-            <Button
-              className="w-full"
-              onClick={() => onDescriptionEditSubmit({ description })}
-            >
-              Save Changes
-            </Button>
+            {boardData.isMemberOfBoard && (
+              <>
+                <Button className="w-full" variant="destructive">
+                  Delete Card
+                </Button>
+                <Button
+                  className="w-full"
+                  onClick={() => onDescriptionEditSubmit({ description })}
+                >
+                  Save Changes
+                </Button>
+              </>
+            )}
           </section>
         </div>
       </DialogContent>
