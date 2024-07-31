@@ -1,5 +1,5 @@
 {
-  "id": "2d01ca09-0121-4902-bf4b-e97a4341dac1",
+  "id": "7f0fbc38-ce6e-4154-8c27-5d7606c2f418",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -62,8 +62,8 @@
       },
       "uniqueConstraints": {}
     },
-    "public.activities_table": {
-      "name": "activities_table",
+    "public.activities": {
+      "name": "activities",
       "schema": "",
       "columns": {
         "id": {
@@ -106,9 +106,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "activities_table_user_id_user_id_fk": {
-          "name": "activities_table_user_id_user_id_fk",
-          "tableFrom": "activities_table",
+        "activities_user_id_user_id_fk": {
+          "name": "activities_user_id_user_id_fk",
+          "tableFrom": "activities",
           "tableTo": "user",
           "columnsFrom": [
             "user_id"
@@ -119,9 +119,58 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "activities_table_card_id_card_id_fk": {
-          "name": "activities_table_card_id_card_id_fk",
-          "tableFrom": "activities_table",
+        "activities_card_id_card_id_fk": {
+          "name": "activities_card_id_card_id_fk",
+          "tableFrom": "activities",
+          "tableTo": "card",
+          "columnsFrom": [
+            "card_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.attachments": {
+      "name": "attachments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "card_id": {
+          "name": "card_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "attachments_card_id_card_id_fk": {
+          "name": "attachments_card_id_card_id_fk",
+          "tableFrom": "attachments",
           "tableTo": "card",
           "columnsFrom": [
             "card_id"

@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "build": "remix vite:build",
-    "dev": "remix vite:dev",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
-    "start": "remix-serve ./build/server/index.js",
+    "dev": "tsx ./server.ts",
+    "start": "cross-env NODE_ENV=production tsx ./server.ts",
     "typecheck": "tsc",
     "db:generate": "drizzle-kit generate --dialect=postgresql --schema=db/schema.ts --out=./drizzle",
     "db:migrate": "tsx ./db/migrate.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.621.0",
     "@dnd-kit/core": "^6.1.0",
     "@dnd-kit/modifiers": "^7.0.0",
     "@dnd-kit/sortable": "^8.0.0",
@@ -28,6 +29,7 @@
     "@remix-run/serve": "^2.10.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "cross-env": "^7.0.3",
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.32.1",
     "isbot": "^4.4.0",
@@ -45,8 +47,10 @@
   },
   "devDependencies": {
     "@remix-run/dev": "^2.10.3",
+    "@types/express": "^4.17.21",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "autoprefixer": "^10.4.19",
@@ -60,6 +64,7 @@
     "postcss": "^8.4.40",
     "tailwind-scrollbar": "^3.1.0",
     "tailwindcss": "^3.4.7",
+    "tsx": "^4.16.3",
     "typescript": "^5.5.4",
     "vite": "^5.3.5",
     "vite-tsconfig-paths": "^4.3.2"

@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { AutosizeTextarea } from "@/components/ui/autosize-text-area";
 import { useBoardContext } from "@/components/providers/board-provider";
+import { Input } from "@/components/ui/input";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -154,7 +155,7 @@ export default function CardPage() {
   }
 
   const board = data?.board;
-  console.log(board);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClickOutside}>
       <DialogContent
@@ -166,9 +167,18 @@ export default function CardPage() {
             <DialogHeader className="space-y-0 mb-6 text-start">
               <div className="flex gap-x-4 items-center w-full">
                 <FolderIcon className="min-w-6 min-h-6" />
-                <DialogTitle className="text-xl font-bold w-full">
-                  {board?.name}
-                </DialogTitle>
+                {!isEditing && (
+                  <DialogTitle className="text-xl font-bold w-full">
+                    {board?.name}
+                  </DialogTitle>
+                )}
+                {isEditing && (
+                  <Input
+                    className="text-base sm:text-sm"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                )}
               </div>
               <DialogDescription className="ml-10 text-start">
                 Created by {board?.user?.name}
@@ -205,39 +215,31 @@ export default function CardPage() {
                 </article>
               </section>
             </div>
-            <section className="mt-10 flex items-center flex-col sm:flex-row justify-end w-full sm:ml-auto gap-y-2 sm:gap-y-0 gap-x-12">
-              {boardData.isMemberOfBoard && (
-                <>
-                  <Button
-                    className="flex-1 w-full sm:max-w-[20%] sm:mr-auto"
-                    variant="destructive"
-                  >
-                    Delete Board
-                  </Button>
-                  <div className="flex flex-col gap-x-4 w-full gap-y-2 sm:gap-y-0 sm:w-1/2 sm:flex-row">
-                    <Button
-                      className="w-full"
-                      onClick={() => {
-                        setError(null);
-                        setIsEditing((prev) => !prev);
-                        setDescription(data?.board.description || "");
-                      }}
-                      variant="secondary"
-                    >
-                      {isEditing ? "Cancel" : "Edit"}
-                    </Button>
-
-                    <Button
-                      className="w-full"
-                      onClick={() => onDescriptionEditSubmit({ description })}
-                    >
-                      Save Changes
-                    </Button>
-                  </div>
-                </>
-              )}
-            </section>
           </div>
+          <section className="mt-10 flex items-center flex-col gap-y-2">
+            {boardData.isMemberOfBoard && (
+              <>
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setError(null);
+                    setIsEditing((prev) => !prev);
+                    setDescription(data?.board.description || "");
+                  }}
+                  variant="secondary"
+                >
+                  {isEditing ? "Cancel" : "Edit"}
+                </Button>
+
+                <Button
+                  className="w-full"
+                  onClick={() => onDescriptionEditSubmit({ description })}
+                >
+                  Save Changes
+                </Button>
+              </>
+            )}
+          </section>
         </div>
       </DialogContent>
     </Dialog>

@@ -117,7 +117,7 @@ export const cardsTable = pgTable(
   }
 );
 
-export const activitiesTable = pgTable("activities_table", {
+export const activitiesTable = pgTable("activities", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -132,11 +132,22 @@ export const activitiesTable = pgTable("activities_table", {
     .references(() => cardsTable.id),
 });
 
+export const attachmentsTable = pgTable("attachments", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  cardId: text("card_id")
+    .notNull()
+    .references(() => cardsTable.id),
+});
+
 export type User = InferSelectModel<typeof usersTable>;
 export type List = InferSelectModel<typeof listsTable>;
 export type Card = InferSelectModel<typeof cardsTable>;
 export type Acitivity = InferSelectModel<typeof activitiesTable>;
-
+export type Attachment = InferSelectModel<typeof attachmentsTable>;
 export interface ListWithDateAsString extends Omit<List, "createdAt"> {
   createdAt: string;
 }
@@ -144,6 +155,10 @@ export interface CardWithDateAsString extends Omit<Card, "createdAt"> {
   createdAt: string;
 }
 export interface ActivityWithDateAsString extends Omit<Acitivity, "createdAt"> {
+  createdAt: string;
+}
+export interface AttachmentWithDateAsString
+  extends Omit<Attachment, "createdAt"> {
   createdAt: string;
 }
 export interface ActivityWIthDateAsStringAndUser
