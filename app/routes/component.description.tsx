@@ -12,6 +12,8 @@ import { db } from "db";
 import {
   activitiesTable,
   ActivityWIthDateAsStringAndUser,
+  boardsTable,
+  BoardWithDateAsStringAndUser,
   cardsTable,
   CardWithDateAsString,
 } from "db/schema";
@@ -37,32 +39,61 @@ export async function action({ request }: ClientActionFunctionArgs) {
     return json({ message: "Something went wrong.", ok: false });
   }
 
-  const cardId = jsonData.cardId;
-  if (!cardId) {
-    return json({ message: "Something went wrong.", ok: false });
+  if (jsonData.type === "Card") {
+    const cardId = jsonData.cardId;
+
+    if (!cardId) {
+      return json({ message: "Something went wrong.", ok: false });
+    }
+
+    //TODO: Make sure user is authorized to do this
+    try {
+      await db
+        .update(cardsTable)
+        .set({
+          description: formData.data.description,
+        })
+        .where(eq(cardsTable.id, cardId));
+
+      await db.insert(activitiesTable).values({
+        cardId: cardId,
+        description: "updated the description",
+        userId: user.id,
+        userName: user.name || "",
+      });
+    } catch (error) {
+      console.error(error);
+      return json({ message: "Database error.", ok: false });
+    }
+
+    return json({ message: "Description successfully changed!", ok: true });
+  } else if (jsonData.type === "Board") {
+    const boardId = jsonData.boardId;
+
+    if (!boardId) {
+      return json({ message: "Something went wrong.", ok: false });
+    }
+
+    try {
+      await db
+        .update(boardsTable)
+        .set({
+          description: formData.data.description,
+        })
+        .where(eq(boardsTable.id, boardId));
+
+      // TODO: Add activites for boards?
+      // await db.insert(activitiesTable).values({
+      //   cardId: cardId,
+      //   description: "updated the description",
+      //   userId: user.id,
+      //   userName: user.name || "",
+      // });
+    } catch (error) {
+      console.error(error);
+      return json({ message: "Database error.", ok: false });
+    }
   }
-
-  //TODO: Make sure user is authorized to do this
-  try {
-    await db
-      .update(cardsTable)
-      .set({
-        description: formData.data.description,
-      })
-      .where(eq(cardsTable.id, cardId));
-
-    await db.insert(activitiesTable).values({
-      cardId: cardId,
-      description: "updated the description",
-      userId: user.id,
-      userName: user.name || "",
-    });
-  } catch (error) {
-    console.error(error);
-    return json({ message: "Database error.", ok: false });
-  }
-
-  return json({ message: "Description successfully changed!", ok: true });
 }
 
 export type DataType =
@@ -71,30 +102,36 @@ export type DataType =
     })
   | undefined;
 
-export function Description({
+export function DescriptionComponent({
   card,
+  board,
   boardData,
 }: {
-  card: DataType;
+  card?: DataType;
+  board?: BoardWithDateAsStringAndUser | undefined;
   boardData: BoardData;
 }) {
-  const editCard = useFetcher<typeof action>();
+  const editDescription = useFetcher<typeof action>();
   const params = useParams();
 
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [description, setDescription] = useState(card?.description || "");
+  const [description, setDescription] = useState(
+    card?.description || board?.description || ""
+  );
+
+  const data = card || board;
 
   useEffect(() => {
-    if (!editCard.data) return;
-    console.log(editCard.data);
+    if (!editDescription.data) return;
+    console.log(editDescription.data);
     //TODO: Add toast bruh
     // TODO: if update failed for whatever reason, roll back description
-  }, [editCard.data]);
+  }, [editDescription.data]);
 
   useEffect(() => {
-    setDescription(card?.description || "");
-  }, [card?.description]);
+    setDescription(data?.description || "");
+  }, [data?.description]);
 
   function onDescriptionEditSubmit(
     values: z.infer<typeof newDescriptionSchema>
@@ -113,15 +150,17 @@ export function Description({
       return;
     }
 
-    editCard.submit(
-      { values, cardId: params.cardId },
-      {
-        method: "post",
-        encType: "application/json",
-        action: "/component/description",
-      }
-    );
-    setIsEditingDescription(false);
+    if (card) {
+      editDescription.submit(
+        { values, cardId: params.cardId, type: "Card" },
+        {
+          method: "post",
+          encType: "application/json",
+          action: "/component/description",
+        }
+      );
+      setIsEditingDescription(false);
+    }
   }
   return (
     <article>
@@ -135,7 +174,7 @@ export function Description({
                 onClick={() => {
                   setError(null);
                   setIsEditingDescription((prev) => !prev);
-                  setDescription(card?.description || "");
+                  setDescription(data?.description || "");
                 }}
                 className="ml-auto h-8 w-12"
                 variant="secondary"
@@ -149,7 +188,9 @@ export function Description({
           </div>
           {!isEditingDescription ? (
             <p className="ml-10 text-sm text-muted-foreground">
-              {editCard.state !== "idle" ? description : card?.description}
+              {editDescription.state !== "idle"
+                ? description
+                : data?.description}
             </p>
           ) : (
             <>

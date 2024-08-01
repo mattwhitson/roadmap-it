@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 import { useBoardContext } from "@/components/providers/board-provider";
-import { Description } from "./component.description";
+import { DescriptionComponent } from "./component.description";
 import { AttachmentComponent } from "./component.attachment";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -129,7 +129,7 @@ export default function CardPage() {
     <Dialog open={isOpen} onOpenChange={onClickOutside}>
       <DialogContent
         onInteractOutside={onClickOutside}
-        className="rounded-md w-[95%] overflow-y-auto h-fit max-h-[80%] sm:max-w-3xl sm:max-h-[75%]"
+        className="rounded-md w-[95%] overflow-y-auto scrollbar-zinc-900 scrollbar-zinc-600 scrollbar-thin h-fit max-h-[80%] sm:max-w-3xl sm:max-h-[75%]"
       >
         <div className="flex flex-col sm:flex-row sm:gap-x-12 justify-between">
           <div className="flex flex-col w-full gap-y-4">
@@ -145,7 +145,7 @@ export default function CardPage() {
               </DialogDescription>
             </DialogHeader>
             <section className="flex flex-col space-y-10 w-full">
-              <Description card={card} boardData={boardData} />
+              <DescriptionComponent card={card} boardData={boardData} />
               <AttachmentComponent
                 boardData={boardData}
                 attachments={data?.attachments}

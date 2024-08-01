@@ -144,12 +144,21 @@ export const attachmentsTable = pgTable("attachments", {
 });
 
 export type User = InferSelectModel<typeof usersTable>;
+export type Board = InferSelectModel<typeof boardsTable>;
 export type List = InferSelectModel<typeof listsTable>;
 export type Card = InferSelectModel<typeof cardsTable>;
 export type Acitivity = InferSelectModel<typeof activitiesTable>;
 export type Attachment = InferSelectModel<typeof attachmentsTable>;
+
 export interface ListWithDateAsString extends Omit<List, "createdAt"> {
   createdAt: string;
+}
+export interface BoardWithDateAsString extends Omit<Board, "createdAt"> {
+  createdAt: string;
+}
+export interface BoardWithDateAsStringAndUser
+  extends Omit<BoardWithDateAsString, "createdBy"> {
+  user: User | null;
 }
 export interface CardWithDateAsString extends Omit<Card, "createdAt"> {
   createdAt: string;
@@ -164,6 +173,10 @@ export interface AttachmentWithDateAsString
 export interface ActivityWIthDateAsStringAndUser
   extends ActivityWithDateAsString {
   user: User;
+}
+export interface CardWithDateAsStringAndActivities
+  extends CardWithDateAsString {
+  activities: ActivityWIthDateAsStringAndUser[];
 }
 
 export interface ListWithDateAsStringAndCards {

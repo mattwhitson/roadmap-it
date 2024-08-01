@@ -3,27 +3,20 @@ import { v4 as uuidv4 } from "uuid";
 import { BoardData } from "@/components/providers/board-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PaperclipIcon, TrashIcon } from "lucide-react";
+import { Loader2, PaperclipIcon, TrashIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "@remix-run/react";
 import { ActionFunctionArgs, json, useFetcher } from "react-router-dom";
 import { authenticator } from "~/services.auth.server";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { db } from "db";
 import {
   activitiesTable,
   attachmentsTable,
   AttachmentWithDateAsString,
 } from "db/schema";
-
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_API_ENDPOINT!,
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY!,
-    secretAccessKey: process.env.S3_SECRET_KEY!,
-  },
-});
+import { r2 } from "@/r2";
+import { eq } from "drizzle-orm";
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024 * 4;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg"];
@@ -43,58 +36,94 @@ export async function action({ request }: ActionFunctionArgs) {
     failureRedirect: "/login",
   });
 
-  const formData = await request.formData();
+  if (request.method === "POST") {
+    const formData = await request.formData();
 
-  const values = {
-    attachment: formData.get("attachment"),
-  };
+    const values = {
+      attachment: formData.get("attachment"),
+    };
 
-  const parsedFormData = newAttacmentSchema.safeParse(values);
-  if (!parsedFormData.success) {
-    return json({ message: parsedFormData.error.errors[0].message, ok: false });
-  }
-  const boardId = formData.get("boardId") as string;
-  const cardId = formData.get("cardId") as string;
+    const parsedFormData = newAttacmentSchema.safeParse(values);
+    if (!parsedFormData.success) {
+      return json({
+        message: parsedFormData.error.errors[0].message,
+        ok: false,
+      });
+    }
+    const boardId = formData.get("boardId") as string;
+    const cardId = formData.get("cardId") as string;
 
-  if (!boardId || !cardId) {
-    return json({ message: "Something went wrong.", ok: false });
-  }
-  const file: File = parsedFormData.data.attachment as File;
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const fileId = `cardId/${cardId}/${uuidv4()}/${file.name}`;
+    if (!boardId || !cardId) {
+      return json({ message: "Something went wrong.", ok: false });
+    }
+    const file: File = parsedFormData.data.attachment as File;
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const fileId = `cardId/${cardId}/${uuidv4()}/${file.name}`;
 
-  const putObjectCommand = new PutObjectCommand({
-    Bucket: "roadmap-it",
-    Key: fileId,
-    Body: buffer,
-  });
-
-  try {
-    const response = await r2.send(putObjectCommand);
-    console.log(response);
-  } catch (error) {
-    console.error(error);
-    return json({ message: "Attachment upload failed...", ok: false });
-  }
-
-  try {
-    await db.insert(attachmentsTable).values({
-      cardId: cardId,
-      url: fileId,
+    const putObjectCommand = new PutObjectCommand({
+      Bucket: "roadmap-it",
+      Key: fileId,
+      Body: buffer,
     });
-    await db.insert(activitiesTable).values({
-      cardId: cardId,
-      description: `attached ${file.name} to this card`,
-      userId: user.id,
-      userName: user.name || "",
+
+    try {
+      await r2.send(putObjectCommand);
+    } catch (error) {
+      console.error(error);
+      return json({ message: "Attachment upload failed...", ok: false });
+    }
+
+    try {
+      await db.insert(attachmentsTable).values({
+        cardId: cardId,
+        url: fileId,
+      });
+      await db.insert(activitiesTable).values({
+        cardId: cardId,
+        description: `attached ${file.name} to this card`,
+        userId: user.id,
+        userName: user.name || "",
+      });
+    } catch (error) {
+      console.log(error);
+      return json({ message: "Database error", ok: false });
+    }
+
+    return json({ message: "Attachment successfully uploaded!", ok: true });
+  } else if (request.method === "DELETE") {
+    const jsonData = await request.json();
+    const { attachmentId, attachmentUrl } = jsonData;
+
+    if (!attachmentId || !attachmentUrl) {
+      return json({ message: "Something went wrong.", ok: false });
+    }
+
+    const deleteObjectCommand = new DeleteObjectCommand({
+      Bucket: "roadmap-it",
+      Key: attachmentUrl,
     });
-  } catch (error) {
-    console.log(error);
-    return json({ message: "Database error", ok: false });
+
+    try {
+      await r2.send(deleteObjectCommand);
+    } catch (error) {
+      console.error(error);
+      return json({ message: "Cloudflare R2 Error", ok: false });
+    }
+
+    try {
+      await db
+        .delete(attachmentsTable)
+        .where(eq(attachmentsTable.id, attachmentId));
+    } catch (error) {
+      console.error(error);
+      return json({ message: "Database error", ok: false });
+    }
+
+    return json({ message: "Attachment successfully deleted!", ok: true });
   }
 
-  return json({ message: "Attachment successfully uploaded!", ok: true });
+  return json({ message: "This should never happen", ok: false });
 }
 
 export function AttachmentComponent({
@@ -107,6 +136,7 @@ export function AttachmentComponent({
   const editAttachments = useFetcher<typeof action>();
   const [isEditingAttachments, setIsEditingAttachments] = useState(false);
   const [attachment, setAttachment] = useState<File | undefined>(undefined);
+  const [pendingDeletion, setPendingDeletion] = useState<string | null>(null);
   const [attachmentPath, setAttachmentPath] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const params = useParams();
@@ -114,6 +144,7 @@ export function AttachmentComponent({
   useEffect(() => {
     if (!editAttachments.data) return;
     console.log(editAttachments.data);
+    setPendingDeletion(null);
   }, [editAttachments.data]);
 
   function onAttachmentEditSubmit(values: z.infer<typeof newAttacmentSchema>) {
@@ -147,8 +178,16 @@ export function AttachmentComponent({
     setIsEditingAttachments(false);
   }
 
-  function handleDelete(attachmentId: string) {
-    console.log(attachmentId);
+  function handleDelete(attachmentId: string, attachmentUrl: string) {
+    setPendingDeletion(attachmentId);
+    editAttachments.submit(
+      { attachmentId, attachmentUrl },
+      {
+        method: "delete",
+        encType: "application/json",
+        action: "/component/attachment",
+      }
+    );
   }
 
   return (
@@ -176,17 +215,22 @@ export function AttachmentComponent({
         <div className="flex flex-col space-y-2 ml-8">
           {attachments?.map((attachment) => (
             <div className="flex items-center space-x-4" key={attachment.id}>
-              <div className="h-28 w-52 overflow-hidden rounded-md border-[1px] mt-1">
-                <img
-                  src={`https://pub-71d63f3a0192409e98c503499c6c6aa0.r2.dev/${attachment.url}`}
-                  alt={`attachment ${attachment.url}`}
-                />
+              <div className="h-28 w-52 overflow-hidden rounded-md border-[1px] mt-1 flex items-center justify-center">
+                {pendingDeletion === attachment.id ? (
+                  <Loader2 className="animate-spin absolute" />
+                ) : (
+                  <img
+                    src={`https://pub-71d63f3a0192409e98c503499c6c6aa0.r2.dev/${attachment.url}`}
+                    alt={`attachment ${attachment.url}`}
+                    className="object-fill"
+                  />
+                )}
               </div>
-              {boardData.isMemberOfBoard && (
+              {isEditingAttachments && (
                 <Button
                   variant="ghost"
                   className="w-8 h-8 p-2"
-                  onClick={() => handleDelete(attachment.id)}
+                  onClick={() => handleDelete(attachment.id, attachment.url)}
                 >
                   <TrashIcon />
                 </Button>

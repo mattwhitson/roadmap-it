@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { AutosizeTextarea } from "@/components/ui/autosize-text-area";
 import { useBoardContext } from "@/components/providers/board-provider";
 import { Input } from "@/components/ui/input";
+import { DescriptionComponent } from "./component.description";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -185,59 +186,18 @@ export default function CardPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col sm:flex-row sm:gap-x-12 justify-between">
-              <section className="flex flex-col space-y-10 w-full">
-                <article>
-                  <div className="flex items-end">
-                    <div className="w-full">
-                      <div className="flex gap-x-4 items-center">
-                        <NotebookTextIcon className="min-w-6 min-h-6" />
-                        <h4 className="text-lg font-semibold">Description</h4>
-                      </div>
-                      {!isEditing ? (
-                        <p className="ml-10 text-sm text-muted-foreground">
-                          {editBoardInfo.state !== "idle" &&
-                          description !== board?.description
-                            ? description
-                            : board?.description}
-                        </p>
-                      ) : (
-                        <AutosizeTextarea
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          className="w-full mt-2"
-                        />
-                      )}
-                      {error && (
-                        <p className="text-destructive text-sm ml-2">{error}</p>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              </section>
+              <DescriptionComponent boardData={boardData} board={board} />
             </div>
           </div>
-          <section className="mt-10 flex items-center flex-col gap-y-2">
+          <section className="mt-10 flex items-center justify-end flex-col gap-y-2">
             {boardData.isMemberOfBoard && (
-              <>
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    setError(null);
-                    setIsEditing((prev) => !prev);
-                    setDescription(data?.board.description || "");
-                  }}
-                  variant="secondary"
-                >
-                  {isEditing ? "Cancel" : "Edit"}
-                </Button>
-
-                <Button
-                  className="w-full"
-                  onClick={() => onDescriptionEditSubmit({ description })}
-                >
-                  Save Changes
-                </Button>
-              </>
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={() => onDescriptionEditSubmit({ description })}
+              >
+                Delete Board
+              </Button>
             )}
           </section>
         </div>

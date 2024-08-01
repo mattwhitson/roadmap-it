@@ -212,9 +212,7 @@ export function DraggableList({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 150,
-        tolerance: 50,
-        distance: 20,
+        distance: 10,
       },
     }),
     useSensor(KeyboardSensor, {

@@ -10,7 +10,7 @@ import {
   CardWithDateAsString,
   listsTable,
 } from "db/schema";
-import { PlusIcon } from "lucide-react";
+import { InfoIcon, PlusIcon } from "lucide-react";
 import { authenticator } from "~/services.auth.server";
 import { Button } from "@/components/ui/button";
 import { ModalTypes, useModalStore } from "@/hooks/use-modal-store";
@@ -116,8 +116,11 @@ export default function BoardPage() {
     <>
       <div className="w-full pt-[4.5rem] h-[calc(100%-4rem)]">
         <div className="py-4 px-4 backdrop-blur-sm flex items-center overflow-hidden">
+          <h1 className="text-2xl font-semibold text-nowrap">{board.name}</h1>
           <Link to={`/board/${board.id}/edit`}>
-            <h1 className="text-2xl font-semibold text-nowrap">{board.name}</h1>
+            <Button variant="ghost" asChild className="h-8 w-8 p-1 ml-2">
+              <InfoIcon />
+            </Button>
           </Link>
           <p className="mx-4 sm:ml-8 overflow-hidden text-ellipsis text-nowrap">
             {board.description}
