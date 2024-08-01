@@ -178,7 +178,10 @@ export interface CardWithDateAsStringAndActivities
   extends CardWithDateAsString {
   activities: ActivityWIthDateAsStringAndUser[];
 }
-
+export interface CardWithDateAsStringAndAttachments
+  extends CardWithDateAsString {
+  attachment: AttachmentWithDateAsString[];
+}
 export interface ListWithDateAsStringAndCards {
   id: string;
   list: ListWithDateAsString;

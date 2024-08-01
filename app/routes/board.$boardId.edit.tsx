@@ -8,8 +8,8 @@ import {
   useParams,
 } from "@remix-run/react";
 import { db } from "db";
-import { boardsTable, boardsToUsers, User, usersTable } from "db/schema";
-import { and, count, eq, sql } from "drizzle-orm";
+import { boardsTable, boardsToUsers, usersTable } from "db/schema";
+import { and, count, eq } from "drizzle-orm";
 import { authenticator } from "~/services.auth.server";
 
 import {
@@ -19,10 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FolderIcon, NotebookTextIcon } from "lucide-react";
+import { FolderIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
-import { AutosizeTextarea } from "@/components/ui/autosize-text-area";
 import { useBoardContext } from "@/components/providers/board-provider";
 import { Input } from "@/components/ui/input";
 import { DescriptionComponent } from "./component.description";

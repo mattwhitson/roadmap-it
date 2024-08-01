@@ -30,7 +30,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return null;
   }
 
-  let board, isUserMemberOfBoard, lists;
+  let board, isUserMemberOfBoard, lists, attachments;
   try {
     board = await db
       .select({
@@ -53,6 +53,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .where(eq(listsTable.boardId, boardId))
       .orderBy(asc(listsTable.position))
       .groupBy(listsTable.id);
+
+    // don't ask me how i figured this out
+    attachments = await db.execute(sql`
+    select 
+        l.*,
+        jsonb_agg(jsonb_build_object(
+          'id', c.id,
+          'name', c.name,
+          'description', c.description,
+          'position', c.position,
+          'attachment', a.attachment) ORDER BY c.position ASC) FILTER(WHERE c.id IS NOT NULL) cards
+        from list l
+        left join card c
+          on c.list_id = l.id
+        left join (select card_id, created_at, jsonb_agg(a) attachment from attachments a GROUP BY card_id, a.created_at) a
+          on a.card_id = c.id WHERE a IS NULL OR a.created_at = (SELECT MAX(created_at) FROM attachments WHERE attachments.card_id = c.id) AND l.board_id = ${boardId}
+        group by l.id
+        ORDER BY l.position ASC
+        
+      `);
 
     isUserMemberOfBoard = await db
       .select({ count: count() })
@@ -86,6 +106,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     isMember: isUserMemberOfBoard?.[0].count
       ? isUserMemberOfBoard[0].count > 0
       : false,
+    attachments,
   };
 }
 
@@ -112,6 +133,7 @@ export default function BoardPage() {
     );
   }, [listsData]);
   //console.log(listsState);
+  console.log(data?.attachments.rows);
   return (
     <>
       <div className="w-full pt-[4.5rem] h-[calc(100%-4rem)]">
