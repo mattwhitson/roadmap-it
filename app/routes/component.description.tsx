@@ -138,9 +138,12 @@ export function DescriptionComponent({
   ) {
     setError(null);
     if (!isEditingDescription) return;
-    if (!params.cardId) return;
+    if (!params.cardId && !params.boardId) return;
 
-    if (description === card?.description) {
+    if (
+      description === card?.description ||
+      description === board?.description
+    ) {
       setError("Description hasn't changed!");
       return;
     }
@@ -150,7 +153,7 @@ export function DescriptionComponent({
       return;
     }
 
-    if (card) {
+    if (card && params.cardId) {
       editDescription.submit(
         { values, cardId: params.cardId, type: "Card" },
         {
@@ -162,6 +165,7 @@ export function DescriptionComponent({
       setIsEditingDescription(false);
     }
   }
+
   return (
     <article>
       <div className="flex items-end">
@@ -199,6 +203,9 @@ export function DescriptionComponent({
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full mt-2"
               />
+              {error && (
+                <p className="text-destructive text-sm ml-2 mt-1">{error}</p>
+              )}
               <Button
                 className="w-12 h-8 mt-2"
                 variant="secondary"
@@ -208,7 +215,6 @@ export function DescriptionComponent({
               </Button>
             </>
           )}
-          {error && <p className="text-destructive text-sm ml-2">{error}</p>}
         </div>
       </div>
     </article>

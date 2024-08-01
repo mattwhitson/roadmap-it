@@ -1,5 +1,11 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
-import { Link, useLoaderData, useNavigate, useParams } from "@remix-run/react";
+import { ActionFunctionArgs, json, LoaderFunctionArgs } from "@remix-run/node";
+import {
+  Link,
+  useFetcher,
+  useLoaderData,
+  useNavigate,
+  useParams,
+} from "@remix-run/react";
 import { db } from "db";
 import {
   activitiesTable,
@@ -24,11 +30,12 @@ import {
 } from "@/components/ui/dialog";
 import { ActivityIcon, FolderIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useBoardContext } from "@/components/providers/board-provider";
 import { DescriptionComponent } from "./component.description";
 import { AttachmentComponent } from "./component.attachment";
+import { deleteCardAttachments } from "@/components/reusable-api-functions";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -106,8 +113,53 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   };
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const user = await authenticator.isAuthenticated(request, {
+    failureRedirect: "/login",
+  });
+  const jsonData = await request.json();
+  const { cardId, boardId, attachmentKeys } = jsonData;
+
+  if (
+    typeof cardId !== "string" ||
+    typeof boardId !== "string" ||
+    !attachmentKeys
+  ) {
+    return json({ message: "Something went wrong...", ok: false });
+  }
+
+  try {
+    const isUserMemberOfBoard = await db
+      .select({ count: count() })
+      .from(boardsToUsers)
+      .where(
+        and(
+          eq(boardsToUsers.boardId, boardId),
+          eq(boardsToUsers.userId, user.id)
+        )
+      );
+
+    if (isUserMemberOfBoard[0].count === 0) {
+      return json({
+        message: "You don't have permission to perform this action",
+        ok: false,
+      });
+    }
+
+    deleteCardAttachments(attachmentKeys);
+
+    await db.delete(cardsTable).where(eq(cardsTable.id, cardId));
+  } catch (error) {
+    console.error(error);
+    return json({ message: "Database error", ok: false });
+  }
+
+  return json({ message: "Card successfully deleted", ok: true });
+}
+
 export default function CardPage() {
   const data = useLoaderData<typeof loader>();
+  const deleteCard = useFetcher<typeof action>();
   const [isOpen, setIsOpen] = useState(true);
 
   const { boardData } = useBoardContext();
@@ -117,11 +169,37 @@ export default function CardPage() {
   const card = data?.card;
   const list = data?.list;
 
-  function onClickOutside() {
+  const onClickOutside = useCallback(() => {
     setIsOpen(false);
     setTimeout(
       () => navigate(`/board/${params.boardId}`, { replace: true }),
       150
+    );
+  }, [navigate, params.boardId]);
+
+  useEffect(() => {
+    if (!deleteCard.data) return;
+    console.log(deleteCard.data);
+    if (deleteCard.data.ok) {
+      // onClickOutside();
+    }
+  }, [deleteCard.data, onClickOutside]);
+
+  function handleDelete() {
+    if (!params.cardId || !params.boardId) return null;
+    const attachmentKeys = data?.attachments.map(
+      (attachment) => attachment.url
+    );
+    deleteCard.submit(
+      {
+        cardId: params.cardId,
+        boardId: params.boardId,
+        attachmentKeys: attachmentKeys || [],
+      },
+      {
+        method: "delete",
+        encType: "application/json",
+      }
     );
   }
 
@@ -196,7 +274,11 @@ export default function CardPage() {
           <section className="mt-6 sm:mt-0 flex flex-col justify-end items-end space-y-2">
             {boardData.isMemberOfBoard && (
               <>
-                <Button className="w-full" variant="destructive">
+                <Button
+                  className="w-full"
+                  variant="destructive"
+                  onClick={handleDelete}
+                >
                   Delete Card
                 </Button>
               </>

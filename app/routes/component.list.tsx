@@ -34,8 +34,15 @@ export async function action({ request }: ActionFunctionArgs) {
   const jsonData = await request.json();
   const { name, boardId, listId } = jsonData;
 
-  if (!boardId || !listId || !name || name == "") {
+  if (!boardId || !listId || !name || name === "") {
     return json({ message: "Something went wrong.", ok: false });
+  }
+
+  if (name.length > 128) {
+    return json({
+      message: "List name cannot be longer than 128 characters",
+      ok: false,
+    });
   }
 
   try {
@@ -111,26 +118,30 @@ export function ListComponent({
   });
 
   useEffect(() => {
-    if (!isMemberOfBoard) return;
-    function detectClickOutsideElement(e: MouseEvent) {
-      if (
+    const detectClickOutsideElement = (e: MouseEvent) => {
+      if (headerRef.current && headerRef.current.contains(e.target as Node)) {
+        setListName(listWithCards.list.name);
+        setIsEditing(true);
+      } else if (
         textAreaRef.current &&
         !textAreaRef.current.textArea.contains(e.target as Node) &&
         textAreaRef.current.textArea !== document.activeElement
       ) {
         setIsEditing(false);
         setListName(listWithCards.list.name);
-      } else if (
-        headerRef.current &&
-        headerRef.current.contains(e.target as Node)
-      ) {
-        setListName(listWithCards.list.name);
-        setIsEditing(true);
       }
-    }
+    };
+
     window.addEventListener("click", detectClickOutsideElement);
-    () => window.removeEventListener("click", detectClickOutsideElement);
-  }, [isMemberOfBoard, listWithCards.list.name]);
+
+    return () => {
+      window.removeEventListener("click", detectClickOutsideElement);
+    };
+  }, [listWithCards]);
+
+  useEffect(() => {
+    setListName(listWithCards.list.name);
+  }, [listWithCards.list.name]);
 
   useEffect(() => {
     if (!editName.data) return;
@@ -139,7 +150,7 @@ export function ListComponent({
   }, [editName.data]);
 
   function handleNameUpdate() {
-    if (listName === listWithCards.list.name) console.log("THEY THE SAME BOY");
+    if (listName === listWithCards.list.name) return;
     if (listName === "") return; // TODO maybe show toast here
     if (!params.boardId) return;
 
@@ -173,7 +184,7 @@ export function ListComponent({
       }}
     >
       <div
-        className="flex items-center w-full h-8"
+        className="flex items-center w-full"
         style={{ marginBottom: `${cards && cards.length ? "0.5rem" : "0rem"}` }}
       >
         {!isEditing && (

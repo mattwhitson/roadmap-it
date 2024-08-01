@@ -5,14 +5,10 @@
  */
 
 import { RemixBrowser } from "@remix-run/react";
-import { startTransition, StrictMode } from "react";
+import { startTransition } from "react";
 import { hydrateRoot } from "react-dom/client";
 
 // Turned off strict mode because it would cause some weird glitches with @dnd-kit that completely disappeared once it was turned off
 startTransition(() => {
-  hydrateRoot(
-    document,
-
-    <RemixBrowser />
-  );
+  hydrateRoot(document, <RemixBrowser />);
 });

@@ -84,7 +84,6 @@ export default function CreateBoardPage() {
     if (!createBoard.data) return;
     console.log(createBoard.data); // TODO ADD SUCCESS TOAST
     if (createBoard.data.ok) {
-      console.log("WTF");
       navigate(`/board/${createBoard.data.id}`);
     }
   }, [createBoard.data, navigate]);

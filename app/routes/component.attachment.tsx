@@ -78,6 +78,7 @@ export async function action({ request }: ActionFunctionArgs) {
       await db.insert(attachmentsTable).values({
         cardId: cardId,
         url: fileId,
+        name: file.name,
       });
       await db.insert(activitiesTable).values({
         cardId: cardId,

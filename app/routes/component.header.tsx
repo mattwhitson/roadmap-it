@@ -16,7 +16,7 @@ export function Header() {
 
   return (
     <header className="w-full bg-background border-b-[1px] shadow-lg dark:shadow-neutral-950 dark:border-zinc-900 fixed z-10">
-      <nav className="max-w-5xl mx-auto p-4 flex items-center">
+      <nav className="p-4 flex items-center">
         <Link to="/">
           <h3 className="text-2xl font-bold text-nowrap">RoadMap It.</h3>
         </Link>

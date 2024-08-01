@@ -44,7 +44,7 @@ export const boardsTable = pgTable("boards", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: varchar("name", { length: 256 }).notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: text("created_by")
@@ -62,10 +62,10 @@ export const boardsToUsers = pgTable(
   {
     userId: text("user_id")
       .notNull()
-      .references(() => usersTable.id),
+      .references(() => usersTable.id, { onDelete: "cascade" }),
     boardId: text("board_id")
       .notNull()
-      .references(() => boardsTable.id),
+      .references(() => boardsTable.id, { onDelete: "cascade" }),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.userId, t.boardId] }),
@@ -95,7 +95,7 @@ export const listsTable = pgTable("list", {
     .references(() => usersTable.id),
   boardId: text("board_id")
     .notNull()
-    .references(() => boardsTable.id),
+    .references(() => boardsTable.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
 });
 
@@ -110,7 +110,7 @@ export const cardsTable = pgTable(
     position: integer("position").notNull(),
     listId: text("list_id")
       .notNull()
-      .references(() => listsTable.id),
+      .references(() => listsTable.id, { onDelete: "cascade" }),
   },
   (t) => {
     return { listAndPosIndex: index("list_and_pos").on(t.listId, t.position) };
@@ -129,7 +129,7 @@ export const activitiesTable = pgTable("activities", {
     .references(() => usersTable.id),
   cardId: text("card_id")
     .notNull()
-    .references(() => cardsTable.id),
+    .references(() => cardsTable.id, { onDelete: "cascade" }),
 });
 
 export const attachmentsTable = pgTable("attachments", {
@@ -137,10 +137,11 @@ export const attachmentsTable = pgTable("attachments", {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   url: text("url").notNull(),
+  name: text("name").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   cardId: text("card_id")
     .notNull()
-    .references(() => cardsTable.id),
+    .references(() => cardsTable.id, { onDelete: "cascade" }),
 });
 
 export type User = InferSelectModel<typeof usersTable>;
@@ -185,5 +186,5 @@ export interface CardWithDateAsStringAndAttachments
 export interface ListWithDateAsStringAndCards {
   id: string;
   list: ListWithDateAsString;
-  cards: CardWithDateAsString[];
+  cards: CardWithDateAsStringAndAttachments[];
 }

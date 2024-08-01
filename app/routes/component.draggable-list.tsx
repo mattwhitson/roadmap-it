@@ -11,6 +11,7 @@ import {
   DragStartEvent,
   Active,
   DragOverEvent,
+  closestCorners,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -21,7 +22,7 @@ import {
 
 import {
   cardsTable,
-  CardWithDateAsString,
+  CardWithDateAsStringAndAttachments,
   listsTable,
   ListWithDateAsStringAndCards,
 } from "db/schema";
@@ -145,7 +146,6 @@ export async function action({ request }: ActionFunctionArgs) {
             )
           );
       } else {
-        console.log(values.finalCardIndex);
         await db
           .update(cardsTable)
           .set({
@@ -204,7 +204,7 @@ export function DraggableList({
   >(null);
   const [activeDraggable, setActiveDraggable] = useState<Active | null>(null);
   const [activeElement, setActiveElement] = useState<
-    ListWithDateAsStringAndCards | CardWithDateAsString | null
+    ListWithDateAsStringAndCards | CardWithDateAsStringAndAttachments | null
   >(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const params = useParams();
@@ -278,8 +278,7 @@ export function DraggableList({
     const { active, over } = event;
     const fromListIndex = findCardInList(active.id as string);
     const toListIndex = findCardInList(over?.id as string);
-    // console.log("overId", over?.id);
-    //console.log(JSON.parse(JSON.stringify(listWithCards)));
+
     if (
       toListIndex === null &&
       fromListIndex !== null &&
@@ -289,7 +288,6 @@ export function DraggableList({
 
       // this means the card has already been put in this empty grid, in that case we don't want to do anything
       if (listWithCards[id].cards.length > 0) return;
-      console.log(active.id, over.id);
       setLists((prev) => {
         const result = [...prev];
 
@@ -336,8 +334,9 @@ export function DraggableList({
         active.rect.current.translated &&
         over.rect.top + (over.rect.bottom - over.rect.top) / 2 <
           active.rect.current.translated.top
-      )
+      ) {
         isBottom++;
+      }
 
       const result = [...prev];
       result[fromListIndex].cards = [
@@ -460,6 +459,7 @@ export function DraggableList({
   //console.log(listWithCards);
   return (
     <DndContext
+      collisionDetection={closestCorners}
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -497,7 +497,9 @@ export function DraggableList({
             index={activeIndex!}
           />
         ) : activeDraggable?.data.current?.isCard ? (
-          <CardComponent card={activeElement as CardWithDateAsString} />
+          <CardComponent
+            card={activeElement as CardWithDateAsStringAndAttachments}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>
