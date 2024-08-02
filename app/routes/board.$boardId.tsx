@@ -203,7 +203,11 @@ export default function BoardPage() {
   const [listsState, setListsState] = useState(listsData || []);
   const { setBoardData } = useBoardContext();
 
-  useSocket(board.id, `/board/${params.boardId}`);
+  useSocket({
+    queryKey: board.id,
+    route: `/board/${params.boardId}`,
+    setListState: setListsState,
+  });
 
   useEffect(() => {
     setBoardData({ isMemberOfBoard: isMemberOfBoard || false });

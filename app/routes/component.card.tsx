@@ -1,7 +1,22 @@
 import { Link, useParams } from "@remix-run/react";
-import { useSortable } from "@dnd-kit/sortable";
+import {
+  AnimateLayoutChanges,
+  defaultAnimateLayoutChanges,
+  useSortable,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CardWithDateAsStringAndAttachments } from "db/schema";
+
+const animateLayoutChanges: AnimateLayoutChanges = function (args) {
+  const { isSorting, wasDragging } = args;
+  if (isSorting || wasDragging) {
+    console.log(isSorting, wasDragging);
+    console.log("Hello");
+    return defaultAnimateLayoutChanges(args);
+  }
+
+  return true;
+};
 
 export function CardComponent({
   card,
@@ -16,27 +31,28 @@ export function CardComponent({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, active } =
     useSortable({
+      animateLayoutChanges,
       id: card.id,
       data: { isCard: true, listIndex: parentIndex, index },
     });
   const style = {
-    transform: CSS.Translate.toString(transform),
     transition,
+    transform: CSS.Translate.toString(transform),
   };
   const params = useParams();
   return (
-    <Link to={`/board/${params.boardId}/card/${card.id}`} {...attributes}>
-      <article
-        ref={setNodeRef}
-        key={card.id}
-        {...listeners}
-        style={{
-          ...style,
-          visibility:
-            active?.id === card.id || isParentListActive ? "hidden" : "visible",
-        }}
-        className="dark:bg-slate-800 rounded-md text-sm"
-      >
+    <Link
+      ref={setNodeRef}
+      style={{
+        ...style,
+        visibility:
+          active?.id === card.id || isParentListActive ? "hidden" : "visible",
+      }}
+      {...listeners}
+      {...attributes}
+      to={`/board/${params.boardId}/card/${card.id}`}
+    >
+      <article className="dark:bg-slate-800 rounded-md text-sm">
         {card.attachment ? (
           <div className="w-full h-40 rounded-md overflow-hidden">
             <img

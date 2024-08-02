@@ -161,9 +161,7 @@ export interface BoardWithDateAsStringAndUser
   extends Omit<BoardWithDateAsString, "createdBy"> {
   user: User | null;
 }
-export interface CardWithDateAsString extends Omit<Card, "createdAt"> {
-  createdAt: string;
-}
+export interface CardWithDateAsString extends Card {}
 export interface ActivityWithDateAsString extends Omit<Acitivity, "createdAt"> {
   createdAt: string;
 }
@@ -181,7 +179,7 @@ export interface CardWithDateAsStringAndActivities
 }
 export interface CardWithDateAsStringAndAttachments
   extends CardWithDateAsString {
-  attachment: AttachmentWithDateAsString[];
+  attachment: AttachmentWithDateAsString[] | null;
 }
 export interface ListWithDateAsStringAndCards {
   id: string;

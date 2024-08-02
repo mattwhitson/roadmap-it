@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
+  AnimateLayoutChanges,
+  defaultAnimateLayoutChanges,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
@@ -25,6 +27,18 @@ import { useFetcher, useParams } from "@remix-run/react";
 import { authenticator } from "~/services.auth.server";
 import { db } from "db";
 import { and, count, eq } from "drizzle-orm";
+
+const animateLayoutChanges: AnimateLayoutChanges = function (args) {
+  const { isSorting, wasDragging } = args;
+
+  if (isSorting || wasDragging) {
+    console.log(isSorting, wasDragging);
+    console.log("YEEET");
+    return defaultAnimateLayoutChanges(args);
+  }
+
+  return true;
+};
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -107,6 +121,7 @@ export function ListComponent({
     isDragging,
     active,
   } = useSortable({
+    animateLayoutChanges,
     id: id,
     data: {
       modifiers: [restrictToHorizontalAxis],

@@ -10,11 +10,13 @@ import { ActionFunctionArgs } from "@remix-run/node";
 import { json, useFetcher, useParams } from "@remix-run/react";
 import { db } from "db";
 import { boardsToUsers, listsTable } from "db/schema";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, gt, sql } from "drizzle-orm";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { useEffect } from "react";
+import { Server } from "socket.io";
 import { authenticator } from "~/services.auth.server";
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
@@ -26,6 +28,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ message: "Something went wrong", ok: false });
   }
 
+  let deletedPosition;
   try {
     //TODO: if we add admins, make sure they admin
     const isUserMemberOfBoard = await db
@@ -43,12 +46,40 @@ export async function action({ request }: ActionFunctionArgs) {
       return null;
     }
 
-    await db.delete(listsTable).where(eq(listsTable.id, listId));
+    const deletedList = await db
+      .delete(listsTable)
+      .where(eq(listsTable.id, listId))
+      .returning();
+    deletedPosition = deletedList[0].position;
+
+    await db
+      .update(listsTable)
+      .set({
+        position: sql`${listsTable.position} - 1`,
+      })
+      .where(
+        and(
+          gt(listsTable.position, deletedPosition),
+          eq(listsTable.boardId, boardId)
+        )
+      );
   } catch (error) {
     console.error(error);
     return json({ message: "Database error.", ok: false });
   }
 
+  const io = context.io as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    unknown
+  >;
+
+  io.emit(boardId, {
+    type: "DeleteList",
+    listId,
+    deletedPosition,
+  });
   return json({ message: "List successfully deleted!", ok: true });
 }
 

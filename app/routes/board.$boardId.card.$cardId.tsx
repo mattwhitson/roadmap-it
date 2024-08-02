@@ -14,10 +14,11 @@ import {
   boardsTable,
   boardsToUsers,
   cardsTable,
+  CardWithDateAsStringAndActivities,
   listsTable,
   usersTable,
 } from "db/schema";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, gt, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { authenticator } from "~/services.auth.server";
 
@@ -36,6 +37,9 @@ import { useBoardContext } from "@/components/providers/board-provider";
 import { DescriptionComponent } from "./component.description";
 import { AttachmentComponent } from "./component.attachment";
 import { deleteCardAttachments } from "@/components/reusable-api-functions";
+import { Server } from "socket.io";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
+import { useSocket } from "@/hooks/use-socket";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -81,6 +85,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         listId: cardsTable.listId,
         name: cardsTable.name,
         description: cardsTable.description,
+        position: cardsTable.position,
+
         activities: sql<
           ActivityWIthDateAsStringAndUser[]
         >`json_agg(json_build_object('id', ${activitiesTable.id}, 'userName', ${activitiesTable.userName},
@@ -113,21 +119,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   };
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
   const jsonData = await request.json();
-  const { cardId, boardId, attachmentKeys } = jsonData;
+  const { cardId, boardId, listId, attachmentKeys } = jsonData;
 
   if (
     typeof cardId !== "string" ||
     typeof boardId !== "string" ||
+    typeof listId !== "string" ||
     !attachmentKeys
   ) {
     return json({ message: "Something went wrong...", ok: false });
   }
 
+  let deletedPosition;
   try {
     const isUserMemberOfBoard = await db
       .select({ count: count() })
@@ -148,12 +156,40 @@ export async function action({ request }: ActionFunctionArgs) {
 
     deleteCardAttachments(attachmentKeys);
 
-    await db.delete(cardsTable).where(eq(cardsTable.id, cardId));
+    const deletedCard = await db
+      .delete(cardsTable)
+      .where(eq(cardsTable.id, cardId))
+      .returning();
+
+    deletedPosition = deletedCard[0].position;
+    await db
+      .update(cardsTable)
+      .set({
+        position: sql`${cardsTable.position} - 1`,
+      })
+      .where(
+        and(
+          gt(cardsTable.position, deletedPosition),
+          eq(cardsTable.listId, listId)
+        )
+      );
   } catch (error) {
     console.error(error);
     return json({ message: "Database error", ok: false });
   }
 
+  const io = context.io as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    unknown
+  >;
+  io.emit(boardId, {
+    type: "DeleteCard",
+    deletedPosition,
+    cardId,
+    listId,
+  });
   return json({ message: "Card successfully deleted", ok: true });
 }
 
@@ -166,8 +202,19 @@ export default function CardPage() {
 
   const navigate = useNavigate();
   const params = useParams();
-  const card = data?.card;
+  const cardData = data?.card;
   const list = data?.list;
+
+  const [card, setCard] = useState(
+    cardData || ({} as CardWithDateAsStringAndActivities)
+  );
+  const [attachments, setAttachments] = useState(data?.attachments || []);
+
+  useSocket({
+    queryKey: params.cardId,
+    setAttachmentState: setAttachments,
+    setCardState: setCard,
+  });
 
   const onClickOutside = useCallback(() => {
     setIsOpen(false);
@@ -181,12 +228,12 @@ export default function CardPage() {
     if (!deleteCard.data) return;
     console.log(deleteCard.data);
     if (deleteCard.data.ok) {
-      // onClickOutside();
+      onClickOutside();
     }
   }, [deleteCard.data, onClickOutside]);
 
   function handleDelete() {
-    if (!params.cardId || !params.boardId) return null;
+    if (!params.cardId || !params.boardId || !list?.id) return null;
     const attachmentKeys = data?.attachments.map(
       (attachment) => attachment.url
     );
@@ -194,6 +241,7 @@ export default function CardPage() {
       {
         cardId: params.cardId,
         boardId: params.boardId,
+        listId: list?.id,
         attachmentKeys: attachmentKeys || [],
       },
       {
@@ -202,6 +250,7 @@ export default function CardPage() {
       }
     );
   }
+  if (card?.name === "yeet") console.log(attachments);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClickOutside}>
@@ -225,8 +274,9 @@ export default function CardPage() {
             <section className="flex flex-col space-y-10 w-full">
               <DescriptionComponent card={card} boardData={boardData} />
               <AttachmentComponent
+                listId={list?.id}
                 boardData={boardData}
-                attachments={data?.attachments}
+                attachments={attachments}
               />
 
               <section>

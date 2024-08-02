@@ -64,6 +64,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ message: "Something went wrong", ok: false });
   }
 
+  let newCard;
   try {
     //TODO: if we add admins, make sure they admin
     const isUserMemberOfBoard = await db
@@ -81,7 +82,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return null;
     }
 
-    const newCard = await db
+    newCard = await db
       .insert(cardsTable)
       .values({
         listId: listId,
@@ -91,18 +92,29 @@ export async function action({ request, context }: ActionFunctionArgs) {
       })
       .returning();
 
-    await db.insert(activitiesTable).values({
-      cardId: newCard[0].id,
-      description: `added this card to ${listName}`,
-      userId: user.id,
-      userName: user.name || "",
-    });
+    await db
+      .insert(activitiesTable)
+      .values({
+        cardId: newCard[0].id,
+        description: `added this card to ${listName}`,
+        userId: user.id,
+        userName: user.name || "",
+      })
+      .returning();
   } catch (error) {
     console.error(error);
     json({ message: "Database error", ok: false });
   }
 
-  io.emit(boardId);
+  if (newCard?.[0]) {
+    io.emit(boardId, {
+      type: "AddCard",
+      newCard: {
+        ...newCard[0],
+        attachment: null,
+      },
+    });
+  }
   return json({ message: "Card successfully added!", ok: true });
 }
 

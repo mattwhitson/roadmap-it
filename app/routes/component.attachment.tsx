@@ -62,8 +62,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
     }
     const boardId = formData.get("boardId") as string;
     const cardId = formData.get("cardId") as string;
+    const listId = formData.get("listId") as string;
 
-    if (!boardId || !cardId) {
+    if (!boardId || !cardId || !listId) {
       return json({ message: "Something went wrong.", ok: false });
     }
     const file: File = parsedFormData.data.attachment as File;
@@ -84,30 +85,59 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return json({ message: "Attachment upload failed...", ok: false });
     }
 
+    let newAttachment, newActivity;
     try {
-      await db.insert(attachmentsTable).values({
-        cardId: cardId,
-        url: fileId,
-        name: file.name,
-      });
-      await db.insert(activitiesTable).values({
-        cardId: cardId,
-        description: `attached ${file.name} to this card`,
-        userId: user.id,
-        userName: user.name || "",
-      });
+      newAttachment = await db
+        .insert(attachmentsTable)
+        .values({
+          cardId: cardId,
+          url: fileId,
+          name: file.name,
+        })
+        .returning();
+      newActivity = await db
+        .insert(activitiesTable)
+        .values({
+          cardId: cardId,
+          description: `attached ${file.name} to this card`,
+          userId: user.id,
+          userName: user.name || "",
+        })
+        .returning();
     } catch (error) {
       console.log(error);
       return json({ message: "Database error", ok: false });
     }
-    io.emit(cardId);
-    io.emit(boardId);
+
+    if (newAttachment?.[0]) {
+      io.emit(boardId, {
+        type: "AddAttachment",
+        boardId,
+        cardId,
+        listId,
+        attachment: newAttachment[0],
+      });
+    }
+    if (newAttachment?.[0] && newActivity?.[0]) {
+      io.emit(cardId, {
+        type: "AddAttachment",
+        boardId,
+        listId,
+        cardId,
+        attachment: newAttachment[0],
+        activity: {
+          ...newActivity[0],
+          user,
+        },
+      });
+    }
+
     return json({ message: "Attachment successfully uploaded!", ok: true });
   } else if (request.method === "DELETE") {
     const jsonData = await request.json();
-    const { attachmentId, attachmentUrl } = jsonData;
+    const { attachmentId, attachmentUrl, cardId, boardId, listId } = jsonData;
 
-    if (!attachmentId || !attachmentUrl) {
+    if (!attachmentId || !attachmentUrl || !cardId || !boardId || !listId) {
       return json({ message: "Something went wrong.", ok: false });
     }
 
@@ -123,15 +153,32 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return json({ message: "Cloudflare R2 Error", ok: false });
     }
 
+    let deletedAttachment;
     try {
-      await db
+      deletedAttachment = await db
         .delete(attachmentsTable)
-        .where(eq(attachmentsTable.id, attachmentId));
+        .where(eq(attachmentsTable.id, attachmentId))
+        .returning();
     } catch (error) {
       console.error(error);
       return json({ message: "Database error", ok: false });
     }
-    // TODO need cardId here
+
+    if (deletedAttachment?.[0]) {
+      io.emit(boardId, {
+        type: "DeleteAttachment",
+        cardId,
+        listId,
+        attachment: deletedAttachment[0],
+      });
+
+      io.emit(cardId, {
+        type: "DeleteAttachment",
+        attachment: deletedAttachment[0],
+      });
+    }
+
+    // TODO need cardId here DUDE ADD MORE INFO WHAT DID THIS EVEN MEAN????
     return json({ message: "Attachment successfully deleted!", ok: true });
   }
 
@@ -141,9 +188,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
 export function AttachmentComponent({
   attachments,
   boardData,
+  listId,
 }: {
   attachments: AttachmentWithDateAsString[] | undefined;
   boardData: BoardData;
+  listId: string | undefined;
 }) {
   const editAttachments = useFetcher<typeof action>();
   const [isEditingAttachments, setIsEditingAttachments] = useState(false);
@@ -153,7 +202,10 @@ export function AttachmentComponent({
   const [error, setError] = useState<string | null>(null);
   const params = useParams();
 
-  useSocket(params.cardId, `/board/${params.boardId}/card/${params.cardId}`);
+  useSocket({
+    queryKey: params.cardId,
+    route: `/board/${params.boardId}/card/${params.cardId}`,
+  });
 
   useEffect(() => {
     if (!editAttachments.data) return;
@@ -161,11 +213,10 @@ export function AttachmentComponent({
     setPendingDeletion(null);
   }, [editAttachments.data]);
 
-  useSocket(params.cardId, location.pathname);
   function onAttachmentEditSubmit(values: z.infer<typeof newAttacmentSchema>) {
     setError(null);
     if (!isEditingAttachments) return;
-    if (!params.cardId || !params.boardId) return;
+    if (!params.cardId || !params.boardId || !listId) return;
 
     const parsed = newAttacmentSchema.safeParse(values);
     if (!parsed.success) {
@@ -183,6 +234,7 @@ export function AttachmentComponent({
     formData.append("attachment", values.attachment);
     formData.append("cardId", params.cardId);
     formData.append("boardId", params.boardId);
+    formData.append("listId", listId);
 
     editAttachments.submit(formData, {
       method: "post",
@@ -194,9 +246,16 @@ export function AttachmentComponent({
   }
 
   function handleDelete(attachmentId: string, attachmentUrl: string) {
+    if (!params.cardId || !params.boardId || !listId) return;
     setPendingDeletion(attachmentId);
     editAttachments.submit(
-      { attachmentId, attachmentUrl },
+      {
+        attachmentId,
+        attachmentUrl,
+        cardId: params.cardId,
+        boardId: params.boardId,
+        listId,
+      },
       {
         method: "delete",
         encType: "application/json",

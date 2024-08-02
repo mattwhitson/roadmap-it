@@ -63,20 +63,33 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ message: "Something went wrong", ok: false });
   }
 
+  let newList;
   try {
     // TODO: make sure user is member of board and add activity
-    await db.insert(listsTable).values({
-      boardId: boardId,
-      createdBy: user.id,
-      name: name,
-      position: listCount,
-    });
+    newList = await db
+      .insert(listsTable)
+      .values({
+        boardId: boardId,
+        createdBy: user.id,
+        name: name,
+        position: listCount,
+      })
+      .returning();
   } catch (error) {
     console.error(error);
     return json({ message: "Database erorr", ok: false });
   }
 
-  io.emit(boardId, "yeet my dude");
+  if (newList?.[0]) {
+    io.emit(boardId, {
+      type: "AddList",
+      newList: {
+        list: newList[0],
+        cards: [],
+        id: newList[0].id,
+      },
+    });
+  }
   return json({ message: "List successfully created!", ok: true });
 }
 

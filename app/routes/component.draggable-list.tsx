@@ -12,6 +12,7 @@ import {
   Active,
   DragOverEvent,
   closestCorners,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -451,6 +452,12 @@ export function DraggableList({
     setActiveElement(null);
   }
 
+  const measuringConfig = {
+    droppable: {
+      strategy: MeasuringStrategy.Always,
+    },
+  };
+
   useEffect(() => {
     if (!updatePositions.data) return;
     console.log(updatePositions.data);
@@ -459,6 +466,7 @@ export function DraggableList({
   //console.log(listWithCards);
   return (
     <DndContext
+      measuring={measuringConfig}
       collisionDetection={closestCorners}
       sensors={sensors}
       onDragStart={handleDragStart}
