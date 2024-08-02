@@ -32,6 +32,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBoardContext } from "@/components/providers/board-provider";
 
 import { Input } from "@/components/ui/input";
+import { useSocket } from "@/hooks/use-socket";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -202,6 +203,8 @@ export default function BoardPage() {
   const [listsState, setListsState] = useState(listsData || []);
   const { setBoardData } = useBoardContext();
 
+  useSocket(board.id, `/board/${params.boardId}`);
+
   useEffect(() => {
     setBoardData({ isMemberOfBoard: isMemberOfBoard || false });
   }, [isMemberOfBoard, setBoardData]);
@@ -244,10 +247,6 @@ export default function BoardPage() {
     if (inputDivRef.current && inputRef.current) {
       inputDivRef.current.innerText = boardName;
 
-      console.log(
-        inputDivRef.current.clientWidth,
-        inputRef.current.clientWidth
-      );
       if (inputDivRef.current.clientWidth > inputRef.current.clientWidth) {
         setInputWidth(inputDivRef.current.clientWidth);
       }

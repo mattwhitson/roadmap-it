@@ -17,6 +17,9 @@ import {
 } from "db/schema";
 import { r2 } from "@/r2";
 import { eq } from "drizzle-orm";
+import { Server } from "socket.io";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
+import { useSocket } from "@/hooks/use-socket";
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024 * 4;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg"];
@@ -31,10 +34,17 @@ const newAttacmentSchema = z.object({
     ),
 });
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
+
+  const io = context.io as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    unknown
+  >;
 
   if (request.method === "POST") {
     const formData = await request.formData();
@@ -90,7 +100,8 @@ export async function action({ request }: ActionFunctionArgs) {
       console.log(error);
       return json({ message: "Database error", ok: false });
     }
-
+    io.emit(cardId);
+    io.emit(boardId);
     return json({ message: "Attachment successfully uploaded!", ok: true });
   } else if (request.method === "DELETE") {
     const jsonData = await request.json();
@@ -120,7 +131,7 @@ export async function action({ request }: ActionFunctionArgs) {
       console.error(error);
       return json({ message: "Database error", ok: false });
     }
-
+    // TODO need cardId here
     return json({ message: "Attachment successfully deleted!", ok: true });
   }
 
@@ -142,12 +153,15 @@ export function AttachmentComponent({
   const [error, setError] = useState<string | null>(null);
   const params = useParams();
 
+  useSocket(params.cardId, `/board/${params.boardId}/card/${params.cardId}`);
+
   useEffect(() => {
     if (!editAttachments.data) return;
     console.log(editAttachments.data);
     setPendingDeletion(null);
   }, [editAttachments.data]);
 
+  useSocket(params.cardId, location.pathname);
   function onAttachmentEditSubmit(values: z.infer<typeof newAttacmentSchema>) {
     setError(null);
     if (!isEditingAttachments) return;

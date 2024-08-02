@@ -22,6 +22,8 @@ import { authenticator } from "~/services.auth.server";
 import styles from "~/globals.css?url";
 import { ModalProvider } from "@/components/providers/modal-provider";
 import { BoardProvider } from "@/components/providers/board-provider";
+import { SocketProvider } from "@/components/providers/socket-provider";
+import { User } from "db/schema";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: styles, as: "style" },
@@ -44,16 +46,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
       specifiedTheme={data?.theme as Theme}
       themeAction="/action/set-theme"
     >
-      <InnerLayout ssrTheme={Boolean(data?.theme)}>{children}</InnerLayout>
+      <InnerLayout
+        user={data?.user || undefined}
+        ssrTheme={Boolean(data?.theme)}
+      >
+        {children}
+      </InnerLayout>
     </ThemeProvider>
   );
 }
 
 export function InnerLayout({
   ssrTheme,
+  user,
   children,
 }: {
   ssrTheme: boolean;
+  user?: User | undefined;
   children: React.ReactNode;
 }) {
   const [theme] = useTheme();
@@ -67,10 +76,12 @@ export function InnerLayout({
         <Links />
       </head>
       <body className="font-Poppins">
-        <BoardProvider>
-          {children}
-          <ModalProvider />
-        </BoardProvider>
+        <SocketProvider user={user}>
+          <BoardProvider>
+            {children}
+            <ModalProvider />
+          </BoardProvider>
+        </SocketProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

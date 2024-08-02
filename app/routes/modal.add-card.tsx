@@ -28,16 +28,26 @@ import { db } from "db";
 import { activitiesTable, boardsToUsers, cardsTable } from "db/schema";
 import { useEffect } from "react";
 import { and, count, eq } from "drizzle-orm";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
+import { Server } from "socket.io";
 
 const newCardSchema = z.object({
   name: z.string().min(1).max(256),
   description: z.string().max(256),
 });
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
+
+  const io = context.io as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    unknown
+  >;
+
   const formData = await request.json();
   const jsonData = newCardSchema.safeParse(formData.values);
 
@@ -92,6 +102,7 @@ export async function action({ request }: ActionFunctionArgs) {
     json({ message: "Database error", ok: false });
   }
 
+  io.emit(boardId);
   return json({ message: "Card successfully added!", ok: true });
 }
 

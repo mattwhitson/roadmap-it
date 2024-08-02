@@ -29,15 +29,25 @@ import { listsTable } from "db/schema";
 import { authenticator } from "~/services.auth.server";
 import { useEffect } from "react";
 import { useRevalidate } from "@/hooks/use-revalidate";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
+import { Server } from "socket.io";
 
 const newListSchema = z.object({
   name: z.string().min(1).max(256),
 });
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
+
+  const io = context.io as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    unknown
+  >;
+
   const formData = await request.json();
   const jsonData = newListSchema.safeParse(formData.values);
 
@@ -66,6 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ message: "Database erorr", ok: false });
   }
 
+  io.emit(boardId, "yeet my dude");
   return json({ message: "List successfully created!", ok: true });
 }
 
@@ -83,7 +94,6 @@ export function AddListModal() {
   });
 
   async function onSubmit(values: z.infer<typeof newListSchema>) {
-    console.log(data);
     if (
       !params.boardId ||
       (!data?.listCount && typeof data?.listCount !== "number")
