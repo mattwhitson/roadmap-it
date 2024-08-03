@@ -34,9 +34,7 @@ export function SocketProvider({
 
   useEffect(() => {
     if (!socket) return;
-    socket.on("event", (data) => {
-      console.log(data);
-    });
+    socket.on("event", () => {});
   }, [socket]);
 
   return (

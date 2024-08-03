@@ -2,12 +2,7 @@ import { z } from "zod";
 
 import { AutosizeTextarea } from "@/components/ui/autosize-text-area";
 import { Button } from "@/components/ui/button";
-import {
-  ClientActionFunctionArgs,
-  json,
-  useFetcher,
-  useParams,
-} from "@remix-run/react";
+import { json, useFetcher, useParams } from "@remix-run/react";
 import { db } from "db";
 import {
   activitiesTable,
@@ -22,12 +17,15 @@ import { NotebookTextIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { authenticator } from "~/services.auth.server";
 import { BoardData } from "@/components/providers/board-provider";
+import { Server } from "socket.io";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
+import { ActionFunctionArgs } from "@remix-run/node";
 
 const newDescriptionSchema = z.object({
   description: z.string().max(256),
 });
 
-export async function action({ request }: ClientActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
@@ -40,32 +38,50 @@ export async function action({ request }: ClientActionFunctionArgs) {
   }
 
   if (jsonData.type === "Card") {
-    const cardId = jsonData.cardId;
+    const { cardId } = jsonData;
 
     if (!cardId) {
       return json({ message: "Something went wrong.", ok: false });
     }
 
     //TODO: Make sure user is authorized to do this
+    let newDescription, newActivity;
     try {
-      await db
+      newDescription = await db
         .update(cardsTable)
         .set({
           description: formData.data.description,
         })
-        .where(eq(cardsTable.id, cardId));
+        .where(eq(cardsTable.id, cardId))
+        .returning({ description: cardsTable.description });
 
-      await db.insert(activitiesTable).values({
-        cardId: cardId,
-        description: "updated the description",
-        userId: user.id,
-        userName: user.name || "",
-      });
+      newActivity = await db
+        .insert(activitiesTable)
+        .values({
+          cardId: cardId,
+          description: "updated the description",
+          userId: user.id,
+          userName: user.name || "",
+        })
+        .returning();
     } catch (error) {
       console.error(error);
       return json({ message: "Database error.", ok: false });
     }
 
+    const io = context.io as Server<
+      DefaultEventsMap,
+      DefaultEventsMap,
+      DefaultEventsMap,
+      unknown
+    >;
+    if (newActivity?.[0] && newDescription?.[0]) {
+      io.emit(cardId, {
+        type: "UpdateCardDescription",
+        description: newDescription[0].description,
+        activity: { ...newActivity[0], user: user },
+      });
+    }
     return json({ message: "Description successfully changed!", ok: true });
   } else if (jsonData.type === "Board") {
     const boardId = jsonData.boardId;

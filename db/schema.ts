@@ -144,12 +144,29 @@ export const attachmentsTable = pgTable("attachments", {
     .references(() => cardsTable.id, { onDelete: "cascade" }),
 });
 
+export const requestsTable = pgTable("request", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  requesterId: text("requester_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  requesteeId: text("requestee_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  boardId: text("board_id")
+    .notNull()
+    .references(() => boardsTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export type User = InferSelectModel<typeof usersTable>;
 export type Board = InferSelectModel<typeof boardsTable>;
 export type List = InferSelectModel<typeof listsTable>;
 export type Card = InferSelectModel<typeof cardsTable>;
 export type Acitivity = InferSelectModel<typeof activitiesTable>;
 export type Attachment = InferSelectModel<typeof attachmentsTable>;
+export type Request = InferSelectModel<typeof requestsTable>;
 
 export interface ListWithDateAsString extends Omit<List, "createdAt"> {
   createdAt: string;
@@ -185,4 +202,7 @@ export interface ListWithDateAsStringAndCards {
   id: string;
   list: ListWithDateAsString;
   cards: CardWithDateAsStringAndAttachments[];
+}
+export interface RequestWithDateAsString extends Omit<Request, "createdAt"> {
+  createdAt: string;
 }

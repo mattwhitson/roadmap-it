@@ -1,8 +1,11 @@
+import { RequestWithDateAsString, User } from "db/schema";
 import { create } from "zustand";
 
 export enum ModalTypes {
   AddList,
   AddCard,
+  InviteUser,
+  Invitations,
 }
 
 export interface DataType {
@@ -10,6 +13,8 @@ export interface DataType {
   listCount?: number;
   listName?: string;
   cardsListLength?: number;
+  user?: User;
+  invitations?: RequestWithDateAsString[];
 }
 
 interface ModalState {

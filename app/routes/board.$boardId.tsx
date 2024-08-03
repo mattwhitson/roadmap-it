@@ -23,7 +23,7 @@ import {
   ListWithDateAsString,
   ListWithDateAsStringAndCards,
 } from "db/schema";
-import { InfoIcon, PlusIcon } from "lucide-react";
+import { InfoIcon, PlusIcon, UserPlusIcon } from "lucide-react";
 import { authenticator } from "~/services.auth.server";
 import { Button } from "@/components/ui/button";
 import { ModalTypes, useModalStore } from "@/hooks/use-modal-store";
@@ -33,6 +33,8 @@ import { useBoardContext } from "@/components/providers/board-provider";
 
 import { Input } from "@/components/ui/input";
 import { useSocket } from "@/hooks/use-socket";
+import { Server } from "socket.io";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -59,7 +61,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     if (!board[0]) {
       return redirect("/home");
     }
-
+    console.log(boardId);
     // don't ask me how i figured this out
     lists = await db.execute(sql`
     select 
@@ -74,7 +76,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         left join card c
           on c.list_id = l.id
         left join (select card_id, created_at, jsonb_agg(a) attachment from attachments a GROUP BY card_id, a.created_at) a
-          on a.card_id = c.id WHERE a IS NULL OR a.created_at = (SELECT MAX(created_at) FROM attachments WHERE attachments.card_id = c.id) AND l.board_id = ${boardId}
+          on a.card_id = c.id WHERE (a IS NULL OR a.created_at = (SELECT MAX(created_at) FROM attachments WHERE attachments.card_id = c.id)) AND l.board_id = ${boardId}
         group by l.id
         ORDER BY l.position ASC
         
@@ -112,7 +114,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           createdBy: row.created_by,
           name: row.name,
           position: row.position,
-          boardId: row.boardId,
+          boardId: row.board_id,
         } as ListWithDateAsString,
       });
     }
@@ -121,13 +123,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return {
     board: board[0],
     lists: finalList,
+    user: user,
     isMember: isUserMemberOfBoard?.[0].count
       ? isUserMemberOfBoard[0].count > 0
       : false,
   };
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/home",
   });
@@ -145,6 +148,7 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  let newName;
   try {
     const isUserMemberOfBoard = await db
       .select({ count: count() })
@@ -164,14 +168,28 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    await db
+    newName = await db
       .update(boardsTable)
       .set({ name: name })
-      .where(eq(boardsTable.id, boardId));
+      .where(eq(boardsTable.id, boardId))
+      .returning({ name: boardsTable.name });
   } catch (error) {
     console.error(error);
     return json({ message: "Database error", ok: false });
   }
+
+  const io = context.io as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    unknown
+  >;
+
+  io.emit(boardId, {
+    type: "UpdateBoardName",
+    name: newName[0].name,
+  });
+
   return json({ message: "List title successfully changed!", ok: true });
 }
 
@@ -190,8 +208,9 @@ export default function BoardPage() {
 
   const listsData = data?.lists;
   const isMemberOfBoard = data?.isMember;
-  const { board } = boardData!;
+  const { board: bruh } = boardData!;
 
+  const [board, setBoard] = useState(bruh);
   const [boardName, setBoardName] = useState(board.name);
   const [isEditing, setIsEditing] = useState(false);
   const [inputWidth, setInputWidth] = useState<number | null>(null);
@@ -207,6 +226,8 @@ export default function BoardPage() {
     queryKey: board.id,
     route: `/board/${params.boardId}`,
     setListState: setListsState,
+    setBoardState: setBoard,
+    user: data?.user,
   });
 
   useEffect(() => {
@@ -317,15 +338,24 @@ export default function BoardPage() {
             {board.description}
           </p>
           {isMemberOfBoard && (
-            <Button
-              variant="ghost"
-              className="p-1 ml-auto min-w-8 min-h-8 w-8 h-8"
-              onClick={() =>
-                onOpen(ModalTypes.AddList, { listCount: listsState.length })
-              }
-            >
-              <PlusIcon className="" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                className="p-1 ml-auto min-w-8 min-h-8 w-8 h-8 mr-1"
+                onClick={() => onOpen(ModalTypes.InviteUser)}
+              >
+                <UserPlusIcon />
+              </Button>
+              <Button
+                variant="ghost"
+                className="p-1 min-w-8 min-h-8 w-8 h-8"
+                onClick={() =>
+                  onOpen(ModalTypes.AddList, { listCount: listsState.length })
+                }
+              >
+                <PlusIcon className="" />
+              </Button>
+            </>
           )}
         </div>
         {listsState && listsState.length ? (

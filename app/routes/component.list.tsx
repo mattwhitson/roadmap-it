@@ -27,20 +27,20 @@ import { useFetcher, useParams } from "@remix-run/react";
 import { authenticator } from "~/services.auth.server";
 import { db } from "db";
 import { and, count, eq } from "drizzle-orm";
+import { Server } from "socket.io";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 
 const animateLayoutChanges: AnimateLayoutChanges = function (args) {
   const { isSorting, wasDragging } = args;
 
   if (isSorting || wasDragging) {
-    console.log(isSorting, wasDragging);
-    console.log("YEEET");
     return defaultAnimateLayoutChanges(args);
   }
 
   return true;
 };
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
@@ -59,6 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  let newName;
   try {
     const isUserMemberOfBoard = await db
       .select({ count: count() })
@@ -78,13 +79,28 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    await db
+    newName = await db
       .update(listsTable)
       .set({ name: name })
-      .where(eq(listsTable.id, listId));
+      .where(eq(listsTable.id, listId))
+      .returning({ name: listsTable.name });
   } catch (error) {
     console.error(error);
     return json({ message: "Database error", ok: false });
+  }
+
+  const io = context.io as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    unknown
+  >;
+  if (newName?.[0]) {
+    io.emit(boardId, {
+      type: "UpdateListName",
+      name: newName[0].name,
+      listId,
+    });
   }
   return json({ message: "List title successfully changed!", ok: true });
 }
@@ -192,7 +208,7 @@ export function ListComponent({
   return (
     <section
       ref={setNodeRef}
-      className="w-72 min-w-72 pl-1 pr-2 pb-1 pt-2 rounded-md dark:bg-neutral-900 mt-1 static self-start max-h-[calc(100vh-9.8rem)]"
+      className="text-white w-72 min-w-72 pl-1 pr-2 pb-1 pt-2 rounded-md bg-neutral-900 mt-1 static self-start max-h-[calc(100vh-9.8rem)]"
       style={{
         ...style,
         visibility: index === activeIndex ? "hidden" : "visible",

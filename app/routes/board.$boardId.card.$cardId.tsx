@@ -250,7 +250,6 @@ export default function CardPage() {
       }
     );
   }
-  if (card?.name === "yeet") console.log(attachments);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClickOutside}>

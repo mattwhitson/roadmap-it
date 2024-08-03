@@ -6,12 +6,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CardWithDateAsStringAndAttachments } from "db/schema";
+import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 const animateLayoutChanges: AnimateLayoutChanges = function (args) {
   const { isSorting, wasDragging } = args;
   if (isSorting || wasDragging) {
-    console.log(isSorting, wasDragging);
-    console.log("Hello");
     return defaultAnimateLayoutChanges(args);
   }
 
@@ -29,6 +29,8 @@ export function CardComponent({
   parentIndex?: number;
   isParentListActive?: boolean;
 }) {
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
   const { attributes, listeners, setNodeRef, transform, transition, active } =
     useSortable({
       animateLayoutChanges,
@@ -40,6 +42,10 @@ export function CardComponent({
     transform: CSS.Translate.toString(transform),
   };
   const params = useParams();
+
+  useEffect(() => {
+    if (imageRef.current?.complete) setIsImageLoaded(true);
+  }, [imageRef.current?.complete]);
   return (
     <Link
       ref={setNodeRef}
@@ -52,13 +58,20 @@ export function CardComponent({
       {...attributes}
       to={`/board/${params.boardId}/card/${card.id}`}
     >
-      <article className="dark:bg-slate-800 rounded-md text-sm">
+      <article className="text-white bg-gray-500 dark:bg-slate-800 rounded-md text-sm">
         {card.attachment ? (
-          <div className="w-full h-40 rounded-md overflow-hidden">
+          <div className="w-full h-40 rounded-md overflow-hidden flex justify-center items-center">
             <img
+              ref={imageRef}
               src={`https://pub-71d63f3a0192409e98c503499c6c6aa0.r2.dev/${card.attachment[0].url}`}
               alt="attachment"
+              onLoad={() => {
+                console.log("hey");
+                setIsImageLoaded(true);
+              }}
             />
+
+            {!isImageLoaded && <Loader2 className="h-5 w-5 animate-spin" />}
           </div>
         ) : null}
         <p className="p-2 line-clamp-2">{card.name}</p>

@@ -33,6 +33,8 @@ import { json, useFetcher, useParams } from "@remix-run/react";
 import { db } from "db";
 import { and, eq, gt, gte, lt, ne, sql } from "drizzle-orm";
 import { CardComponent } from "./component.card";
+import { Server } from "socket.io";
+import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 
 function getRangeOfIndicesToAlter(oldIndex: number, newIndex: number) {
   const decrement = oldIndex < newIndex;
@@ -52,8 +54,8 @@ function getRangeOfIndicesToAlter(oldIndex: number, newIndex: number) {
   return { decrement, minIndex, maxIndex };
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  await authenticator.isAuthenticated(request, {
+export async function action({ request, context }: ActionFunctionArgs) {
+  const user = await authenticator.isAuthenticated(request, {
     failureRedirect: "/login",
   });
 
@@ -75,6 +77,8 @@ export async function action({ request }: ActionFunctionArgs) {
       oldIndex,
       newIndex
     );
+
+    let newPosition;
     try {
       // TODO: Check if user is member of board
       let posQuery = sql`${listsTable.position} + 1`;
@@ -97,29 +101,56 @@ export async function action({ request }: ActionFunctionArgs) {
           )
         );
 
-      await db
+      newPosition = await db
         .update(listsTable)
         .set({ position: newIndex })
-        .where(eq(listsTable.id, listId));
+        .where(eq(listsTable.id, listId))
+        .returning({ position: listsTable.position });
     } catch (error) {
       console.error(error);
       json({ message: "Database error.", ok: false });
     }
 
+    const io = context.io as Server<
+      DefaultEventsMap,
+      DefaultEventsMap,
+      DefaultEventsMap,
+      unknown
+    >;
+
+    if (newPosition?.[0]) {
+      io.emit(boardId, {
+        type: "UpdateListPositions",
+        listId: listId,
+        position: newPosition[0].position,
+        oldPosition: oldIndex,
+        userId: user.id,
+      });
+    }
+
     return json({ message: "List positions successfully updated!", ok: true });
   } else {
-    const { values, boardId, movedInSameList, initialIndex, initialListId } =
-      jsonData;
+    const {
+      values,
+      boardId,
+      movedInSameList,
+      initialIndex,
+      initialListId,
+      initalCardIndexFinalList,
+      sameList,
+    } = jsonData;
 
     if (
-      !values === undefined ||
+      values === undefined ||
       boardId === undefined ||
       initialIndex === undefined ||
-      initialListId === undefined
+      initialListId === undefined ||
+      initalCardIndexFinalList === undefined ||
+      sameList === undefined
     ) {
       return json({ message: "Something went wrong.", ok: false });
     }
-
+    let newPosition;
     try {
       if (movedInSameList) {
         const { decrement, minIndex, maxIndex } = getRangeOfIndicesToAlter(
@@ -175,17 +206,40 @@ export async function action({ request }: ActionFunctionArgs) {
           );
       }
 
-      await db
+      newPosition = await db
         .update(cardsTable)
         .set({
           position: values.finalCardIndex,
           listId: values.listId,
         })
-        .where(eq(cardsTable.id, values.cardId));
+        .where(eq(cardsTable.id, values.cardId))
+        .returning({ position: cardsTable.position });
     } catch (error) {
       console.error(error);
       return json({ message: "Database error", ok: false });
     }
+
+    const io = context.io as Server<
+      DefaultEventsMap,
+      DefaultEventsMap,
+      DefaultEventsMap,
+      unknown
+    >;
+    console.log(movedInSameList);
+    if (newPosition?.[0]) {
+      io.emit(boardId, {
+        type: "UpdateCardPositions",
+        finalListIndex: values.finalListIndex,
+        position: newPosition[0].position,
+        oldPosition: initalCardIndexFinalList,
+        userId: user.id,
+        movedLists: !sameList,
+        originalListId: initialListId,
+        cardId: values.cardId,
+        initialIndexInitialList: initialIndex,
+      });
+    }
+
     return json({ message: "Card positions successfully updated!", ok: true });
   }
 }
@@ -240,6 +294,42 @@ export function DraggableList({
         boardId: params.boardId,
         listId: id,
         type: "List",
+      },
+      {
+        method: "post",
+        action: "/component/draggable-list",
+        encType: "application/json",
+      }
+    );
+  }
+
+  function updateCardPositions(
+    cardId: string,
+    listId: string,
+    finalListIndex: number,
+    finalCardIndex: number,
+    movedInSameList: boolean,
+    initialListId: string,
+    initialIndex: number,
+    initalCardIndexFinalList: number,
+    sameList: boolean
+  ) {
+    if (!params.boardId) return;
+    updatePositions.submit(
+      {
+        values: {
+          cardId,
+          listId,
+          finalListIndex,
+          finalCardIndex,
+        },
+        boardId: params.boardId,
+        type: "Card",
+        movedInSameList,
+        initialListId,
+        initialIndex,
+        initalCardIndexFinalList,
+        sameList,
       },
       {
         method: "post",
@@ -353,39 +443,6 @@ export function DraggableList({
     });
   }
 
-  function updateCardPositions(
-    cardId: string,
-    listId: string,
-    finalListIndex: number,
-    finalCardIndex: number,
-    movedInSameList: boolean,
-    initialListId: string,
-    initialIndex: number
-  ) {
-    if (!params.boardId) return;
-    updatePositions.submit(
-      {
-        values: {
-          cardId,
-          listId,
-          finalListIndex,
-          finalCardIndex,
-        },
-        boardId: params.boardId,
-        listId: id,
-        type: "Card",
-        movedInSameList,
-        initialListId,
-        initialIndex,
-      },
-      {
-        method: "post",
-        action: "/component/draggable-list",
-        encType: "application/json",
-      }
-    );
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
@@ -429,7 +486,7 @@ export function DraggableList({
         if (initialCardPosition !== null) {
           const movedInSameList =
             listIndex === initialCardPosition[0] &&
-            overIndex > initialCardPosition[1];
+            overIndex > initialCardPosition[1]; // why did i have this here?
           updateCardPositions(
             activeDraggable?.id.toString() || "",
             listWithCards[listIndex].id,
@@ -437,7 +494,9 @@ export function DraggableList({
             overIndex,
             movedInSameList,
             listWithCards[initialCardPosition[0]].id,
-            initialCardPosition[1]
+            initialCardPosition[1],
+            activeIndex,
+            listIndex === initialCardPosition[0]
           );
         }
 
@@ -462,7 +521,7 @@ export function DraggableList({
     if (!updatePositions.data) return;
     console.log(updatePositions.data);
   }, [updatePositions.data]);
-  // console.log(JSON.parse(JSON.stringify(listWithCards)));
+  //console.log(JSON.parse(JSON.stringify(listWithCards)));
   //console.log(listWithCards);
   return (
     <DndContext
