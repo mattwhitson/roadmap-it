@@ -23,6 +23,7 @@ interface ModalState {
   data?: DataType;
   onOpen: (type: ModalTypes, data?: DataType) => void;
   onClose: () => void;
+  updateInvitations: (invitations: RequestWithDateAsString[]) => void;
 }
 
 export const useModalStore = create<ModalState>((set) => ({
@@ -32,4 +33,6 @@ export const useModalStore = create<ModalState>((set) => ({
   onOpen: (type: ModalTypes, data?: DataType) =>
     set({ type: type, isOpen: true, data: data }),
   onClose: () => set({ type: null, isOpen: false }),
+  updateInvitations: (invitations: RequestWithDateAsString[]) =>
+    set({ data: { invitations: invitations } }),
 }));

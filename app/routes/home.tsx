@@ -1,8 +1,10 @@
+import { useSocket } from "@/hooks/use-socket";
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { db } from "db";
 import { boardsTable, boardsToUsers } from "db/schema";
 import { and, eq } from "drizzle-orm";
+import { useState } from "react";
 import { authenticator } from "~/services.auth.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -32,12 +34,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   return {
     boards,
+    user,
   };
 }
 
+export type SimplifiedBoardState = {
+  name: string;
+  id: string;
+};
+
 export default function HomePage() {
   const data = useLoaderData<typeof loader>();
-  const boards = data?.boards;
+  const [boards, setBoards] = useState<SimplifiedBoardState[]>(
+    data?.boards || []
+  );
+
+  useSocket({ queryKey: data?.user.id, setBoardsState: setBoards });
 
   return (
     <main className="flex flex-col items-center justify-center h-full max-w-4xl mx-auto">

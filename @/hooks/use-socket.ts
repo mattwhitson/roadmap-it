@@ -10,6 +10,7 @@ import {
   User,
 } from "db/schema";
 import { Dispatch, SetStateAction, useEffect } from "react";
+import { SimplifiedBoardState } from "~/routes/home";
 
 export function useSocket({
   queryKey,
@@ -19,6 +20,7 @@ export function useSocket({
   setAttachmentState,
   setBoardState,
   setInvitationsState,
+  setBoardsState,
   user,
 }: {
   queryKey?: string;
@@ -28,6 +30,7 @@ export function useSocket({
   setAttachmentState?: Dispatch<SetStateAction<AttachmentWithDateAsString[]>>;
   setBoardState?: Dispatch<SetStateAction<BoardWithDateAsString>>;
   setInvitationsState?: Dispatch<SetStateAction<RequestWithDateAsString[]>>;
+  setBoardsState?: Dispatch<SetStateAction<SimplifiedBoardState[]>>;
   user?: User;
 }) {
   const socket = useSocketContext();
@@ -282,10 +285,12 @@ export function useSocket({
         setInvitationsState((prev) => {
           return [...prev, invitation];
         });
+      } else if (setBoardsState) {
+        const { board } = data;
+        if (data.type === "UpdateBoardsList") {
+          setBoardsState((prev) => [...prev, board]);
+        }
       }
-      // else if (location.pathname === route) {
-      //   navigate(".", { replace: true });
-      // }
     });
 
     return () => {
@@ -303,6 +308,8 @@ export function useSocket({
     setCardState,
     setAttachmentState,
     setBoardState,
+    setBoardsState,
+    setInvitationsState,
     user,
   ]);
 

@@ -9,6 +9,7 @@ import { ModalTypes, useModalStore } from "@/hooks/use-modal-store";
 import { ActionFunctionArgs } from "@remix-run/node";
 import { useFetcher } from "@remix-run/react";
 import { RequestWithDateAsString } from "db/schema";
+import { useEffect } from "react";
 import { authenticator } from "~/services.auth.server";
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -25,8 +26,12 @@ export function HeaderDropdown({
   triggerClassName?: string;
   invitations: RequestWithDateAsString[];
 }) {
-  const { onOpen } = useModalStore();
+  const { updateInvitations, onOpen } = useModalStore();
   const logOut = useFetcher<typeof action>();
+
+  useEffect(() => {
+    updateInvitations(invitations);
+  }, [invitations, updateInvitations]);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className={triggerClassName}>
