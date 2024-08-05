@@ -29,6 +29,7 @@ import { db } from "db";
 import { and, count, eq } from "drizzle-orm";
 import { Server } from "socket.io";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
+import { toast } from "sonner";
 
 const animateLayoutChanges: AnimateLayoutChanges = function (args) {
   const { isSorting, wasDragging } = args;
@@ -176,7 +177,7 @@ export function ListComponent({
 
   useEffect(() => {
     if (!editName.data) return;
-    console.log(editName.data);
+    toast(editName.data.message);
     // TODO add toast
   }, [editName.data]);
 

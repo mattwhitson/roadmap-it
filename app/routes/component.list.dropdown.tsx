@@ -14,6 +14,7 @@ import { and, count, eq, gt, sql } from "drizzle-orm";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { useEffect } from "react";
 import { Server } from "socket.io";
+import { toast } from "sonner";
 import { authenticator } from "~/services.auth.server";
 
 export async function action({ request, context }: ActionFunctionArgs) {
@@ -102,8 +103,7 @@ export function ListDropdown({
 
   useEffect(() => {
     if (!deleteList.data) return;
-    console.log(deleteList.data);
-    // TODO: ADD TOAST ON SUCCESS/ERROR
+    toast(deleteList.data.message);
   }, [deleteList.data]);
 
   function handleListDelete() {

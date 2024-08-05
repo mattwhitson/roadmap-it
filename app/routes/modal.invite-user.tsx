@@ -35,15 +35,16 @@ import { and, count, eq } from "drizzle-orm";
 import { Server } from "socket.io";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { useEffect } from "react";
+import { toast } from "sonner";
 
 const inviteSchema = z.object({
   email: z.string().email({ message: "Must be a valid email" }),
 });
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await authenticator.isAuthenticated(request);
+
+  if (!user) return null;
   const jsonData = await request.json();
   const parsedData = inviteSchema.safeParse(jsonData.values);
 
@@ -81,7 +82,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
     if (isUserMemberOfBoard[0].count === 0) {
       return json({
-        meesage: "Unauthorized to perform this action",
+        message: "Unauthorized to perform this action",
         ok: false,
       });
     }
@@ -164,11 +165,10 @@ export function InviteUserModal() {
 
   useEffect(() => {
     if (!inviteFetcher.data) return;
-    console.log(inviteFetcher.data);
+    toast(inviteFetcher.data.message);
     if (inviteFetcher.data.ok) {
       form.reset();
       onClose();
-      // TODO add toast
     }
   }, [inviteFetcher.data, form, onClose]);
 

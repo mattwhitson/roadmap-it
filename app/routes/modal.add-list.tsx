@@ -31,6 +31,7 @@ import { useEffect } from "react";
 import { useRevalidate } from "@/hooks/use-revalidate";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { Server } from "socket.io";
+import { toast } from "sonner";
 
 const newListSchema = z.object({
   name: z.string().min(1).max(256),
@@ -124,7 +125,7 @@ export function AddListModal() {
 
   useEffect(() => {
     if (!addList.data) return;
-    console.log(addList.data); // TODO: add toast
+    toast(addList.data.message);
     if (addList.data.ok) {
       onClose();
     }

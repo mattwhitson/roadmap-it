@@ -11,9 +11,9 @@ import { useEffect, useState } from "react";
 import { useSocket } from "@/hooks/use-socket";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await authenticator.isAuthenticated(request);
+
+  if (!user) return null;
 
   let invitations;
   try {

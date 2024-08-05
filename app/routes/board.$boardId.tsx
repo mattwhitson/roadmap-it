@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { useSocket } from "@/hooks/use-socket";
 import { Server } from "socket.io";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
+import { toast } from "sonner";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -263,9 +264,7 @@ export default function BoardPage() {
 
   useEffect(() => {
     if (!editBoardName.data) return;
-    console.log(editBoardName.data);
-    // TODO: add toast bruh
-    // also show toasts for errors
+    toast(editBoardName.data.message);
   }, [editBoardName.data]);
 
   function getTextWidth() {

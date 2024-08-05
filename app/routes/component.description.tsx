@@ -20,6 +20,7 @@ import { BoardData } from "@/components/providers/board-provider";
 import { Server } from "socket.io";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { ActionFunctionArgs } from "@remix-run/node";
+import { toast } from "sonner";
 
 const newDescriptionSchema = z.object({
   description: z.string().max(256),
@@ -140,8 +141,7 @@ export function DescriptionComponent({
 
   useEffect(() => {
     if (!editDescription.data) return;
-    console.log(editDescription.data);
-    //TODO: Add toast bruh
+    toast(editDescription.data.message);
     // TODO: if update failed for whatever reason, roll back description
   }, [editDescription.data]);
 

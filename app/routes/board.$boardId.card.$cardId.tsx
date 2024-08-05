@@ -40,6 +40,7 @@ import { deleteCardAttachments } from "@/components/reusable-api-functions";
 import { Server } from "socket.io";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { useSocket } from "@/hooks/use-socket";
+import { toast } from "sonner";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -226,7 +227,7 @@ export default function CardPage() {
 
   useEffect(() => {
     if (!deleteCard.data) return;
-    console.log(deleteCard.data);
+    toast(deleteCard.data.message);
     if (deleteCard.data.ok) {
       onClickOutside();
     }

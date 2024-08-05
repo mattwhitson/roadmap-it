@@ -22,6 +22,7 @@ import { CheckIcon, Loader2, XIcon } from "lucide-react";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { useEffect, useState } from "react";
 import { Server } from "socket.io";
+import { toast } from "sonner";
 import { authenticator } from "~/services.auth.server";
 
 type LimitedBoard = {
@@ -30,9 +31,9 @@ type LimitedBoard = {
 };
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await authenticator.isAuthenticated(request);
+
+  if (!user) return null;
 
   try {
     const requests = await db
@@ -58,9 +59,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: "/login",
-  });
+  const user = await authenticator.isAuthenticated(request);
+
+  if (!user) return null;
 
   const jsonData = await request.json();
   const { accepted, boardId } = jsonData;
@@ -146,7 +147,7 @@ export function InvitationsModal() {
 
   useEffect(() => {
     if (!responseToRequest.data) return;
-    console.log(responseToRequest.data); // TODO you know
+    toast(responseToRequest.data.message);
   }, [responseToRequest]);
 
   const isModalOpen = isOpen && type === ModalTypes.Invitations;

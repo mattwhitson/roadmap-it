@@ -3,8 +3,14 @@ import { io, Socket } from "socket.io-client";
 import { DefaultEventsMap } from "node_modules/socket.io/dist/typed-events";
 import { User } from "db/schema";
 
+declare global {
+  interface Window {
+    ENV: { [key: string]: string };
+  }
+}
+
 export function connect() {
-  return io("http://localhost:3000");
+  return io(window.ENV.HOST_URL);
 }
 
 export const SocketContext = createContext<

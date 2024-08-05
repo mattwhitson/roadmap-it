@@ -53,7 +53,10 @@ export default function HomePage() {
 
   return (
     <main className="flex flex-col items-center justify-center h-full max-w-4xl mx-auto">
-      <section className="grid grid-cols-3 gap-x-4">
+      <h2 className="text-5xl font-semibold md:mr-auto lg:pl-20 md:pl-44 mb-8">
+        My Boards
+      </h2>
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4">
         {boards?.map((board) => (
           <BoardCard key={board.id} name={board.name} id={board.id} />
         ))}

@@ -28,6 +28,7 @@ import { useEffect, useState } from "react";
 import { useBoardContext } from "@/components/providers/board-provider";
 import { DescriptionComponent } from "./component.description";
 import { deleteCardAttachments } from "@/components/reusable-api-functions";
+import { toast } from "sonner";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
@@ -168,10 +169,12 @@ export default function CardPage() {
 
   useEffect(() => {
     if (!deleteBoard.data) return;
-    console.log(deleteBoard.data);
-    //TODO: Add toast bruh and redirect to home
+    toast(deleteBoard.data.message);
+    if (deleteBoard.data.ok) {
+      navigate("/home");
+    }
     // TODO: if update failed for whatever reason, roll back description
-  }, [deleteBoard.data]);
+  }, [deleteBoard.data, navigate]);
 
   function onClickOutside() {
     setIsOpen(false);

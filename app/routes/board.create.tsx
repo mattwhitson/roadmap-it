@@ -20,6 +20,7 @@ import { db } from "db";
 import { boardsTable, boardsToUsers } from "db/schema";
 import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   name: z.string().min(1).max(256),
@@ -82,7 +83,7 @@ export default function CreateBoardPage() {
 
   useEffect(() => {
     if (!createBoard.data) return;
-    console.log(createBoard.data); // TODO ADD SUCCESS TOAST
+    toast(createBoard.data.message);
     if (createBoard.data.ok) {
       navigate(`/board/${createBoard.data.id}`);
     }

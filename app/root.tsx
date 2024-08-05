@@ -24,6 +24,7 @@ import { ModalProvider } from "@/components/providers/modal-provider";
 import { BoardProvider } from "@/components/providers/board-provider";
 import { SocketProvider } from "@/components/providers/socket-provider";
 import { User } from "db/schema";
+import { Toaster } from "@/components/ui/sonner";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: styles, as: "style" },
@@ -35,6 +36,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return {
     theme: getTheme(),
     user,
+    envVariables: {
+      HOST_URL: process.env.HOST_URL!,
+    },
   };
 }
 
@@ -49,6 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <InnerLayout
         user={data?.user || undefined}
         ssrTheme={Boolean(data?.theme)}
+        envVariables={data?.envVariables}
       >
         {children}
       </InnerLayout>
@@ -60,10 +65,12 @@ export function InnerLayout({
   ssrTheme,
   user,
   children,
+  envVariables,
 }: {
   ssrTheme: boolean;
   user?: User | undefined;
   children: React.ReactNode;
+  envVariables: { [key: string]: string } | undefined;
 }) {
   const [theme] = useTheme();
   return (
@@ -74,6 +81,11 @@ export function InnerLayout({
         <PreventFlashOnWrongTheme ssrTheme={ssrTheme} />
         <Meta />
         <Links />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.ENV = ${JSON.stringify(envVariables)}`,
+          }}
+        />
       </head>
       <body className="font-Poppins">
         <SocketProvider user={user}>
@@ -82,6 +94,7 @@ export function InnerLayout({
             <ModalProvider />
           </BoardProvider>
         </SocketProvider>
+        <Toaster />
         <ScrollRestoration />
         <Scripts />
       </body>
